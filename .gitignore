@@ -13,7 +13,7 @@
 *.log
 .DS_Store
 .idea
-.env
+
 .project
 .strong-pm
 coverage
@@ -27,6 +27,8 @@ client/package-lock.json
 client/src/environments
 /*-audit.json
 /package-lock.json
+
+.env
 .env.local
 .env.test
 .env.development
