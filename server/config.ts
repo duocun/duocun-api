@@ -1,5 +1,16 @@
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const PORT: any = process.env.PORT;
+const ROUTE_PREFIX: any = process.env.ROUTE_PREFIX;
+const DB_HOST: any = process.env.DB_HOST;
+const DB_NAME: any = process.env.DB_NAME;
+const DB_USERNAME: any = process.env.DB_USERNAME;
+const DB_PASSWORD: any = process.env.DB_PASSWORD;
+
 export interface IJWT {
   EXPIRY: string; // eg. '365 days'
   ALGORITHM: string;
@@ -77,7 +88,7 @@ export class Config {
   public GOOGLE_PLACE_KEY: string = "";
   public GOOGLE_MAP_KEY: string = "";
   public GOOGLE_DISTANCE_KEY: string = "";
-  public API_SERVER: IApiServer;
+  public SERVER: IApiServer;
   public DATABASE: IDatabase;
   public TWILIO: ISmsProvider;
   public WECHAT: ISNS;
@@ -100,8 +111,7 @@ export class Config {
     this.GOOGLE_PLACE_KEY = this.cfg.GOOGLE_PLACE.KEY;
     this.GOOGLE_MAP_KEY = this.cfg.GOOGLE_MAP_KEY;
     this.GOOGLE_DISTANCE_KEY = this.cfg.GOOGLE_DISTANCE.KEY;
-    this.API_SERVER = this.cfg.API_SERVER;
-    this.DATABASE = this.cfg.DATABASE;
+
     this.TWILIO = this.cfg.TWILIO;
     this.WECHAT = this.cfg.WECHAT;
     this.STRIPE = this.cfg.STRIPE;
@@ -110,5 +120,15 @@ export class Config {
     this.GOOGLE_AUTH_CLIENT_ID = this.cfg.GOOGLE_AUTH_CLIENT_ID;
     this.ALPHAPAY = this.cfg.ALPHAPAY;
     this.AWS_S3 = this.cfg.AWS_S3;
+
+    this.DATABASE = {
+      HOST: DB_HOST,
+      NAME: DB_NAME,
+      PORT: 27017,
+      POOL_SIZE: 10,
+      USERNAME: DB_USERNAME,
+      PASSWORD: DB_PASSWORD
+    };
+    this.SERVER = {PORT, ROUTE_PREFIX};
   }
 }

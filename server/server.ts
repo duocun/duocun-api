@@ -67,8 +67,6 @@ import dotenv from "dotenv";
 import log from "./lib/logger";
 dotenv.config();
 
-process.env.TZ = "America/Toronto";
-
 // const swaggerDefinition = YAML.load(path.join(__dirname, "/swagger/info.yaml"));
 // // options for the swagger docs
 // const options = {
@@ -99,8 +97,8 @@ function startCellOrderTask(dbo: any) {
 const apimw = new ApiMiddleWare();
 const utils = new Utils();
 const cfg = new Config();
-const SERVER = cfg.API_SERVER;
-const ROUTE_PREFIX = SERVER.ROUTE_PREFIX;
+
+const ROUTE_PREFIX = cfg.SERVER.ROUTE_PREFIX;
 
 const app = express();
 
@@ -258,7 +256,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.use("/" + ROUTE_PREFIX + "/CellApplications", CellApplicationRouter(dbo));
 
   app.use(express.static(path.join(__dirname, "/../uploads")));
-  app.set("port", process.env.PORT || SERVER.PORT);
+  app.set("port", process.env.PORT || cfg.SERVER.PORT);
 
   const server = app.listen(app.get("port"), () => {
     console.log("API is running on :%d/n", app.get("port"));
@@ -272,68 +270,8 @@ app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false, limit: "1mb" }));
 app.use(bodyParser.json({ limit: "1mb" }));
 
-// const staticPath = path.resolve('client/dist');
 const staticPath = path.resolve("uploads");
+
 console.log(staticPath + "/n/r");
+
 app.use(express.static(staticPath));
-
-// const http = require('http');
-// const express = require('express')
-// const path = require('path')
-// const fs = require('fs');
-// const cfg = JSON.parse(fs.readFileSync('../duocun.cfg.json','utf8'));
-// const DB = require('./db');
-// // const User = require('./user');
-
-// const SERVER = cfg.API_SERVER;
-// const ROUTE_PREFIX = SERVER.ROUTE_PREFIX;
-
-// const app = express();
-// const db = DB().init(cfg.DATABASE);
-
-// console.log(__dirname + '/dist');
-
-// // app.use(express.static(__dirname + '/dist'));
-// // app.get('*',function(req,res){
-// //     res.sendFile(path.join(__dirname, '/dist/index.html'));
-// // });
-// //app.listen(SERVER_PORT, () => console.log('Server setup'))
-
-// app.set('port', process.env.PORT || SERVER.PORT)
-
-// var server = http.createServer(app)
-// server.listen(app.get('port'), function () {
-//   console.log('API server listening on port ' + SERVER.PORT)
-// })
-// import MonerisHt from 'moneris-node';
-
-// const monerisHt = new MonerisHt({
-//   app_name: 'Alejandros Food Delivery',
-//   store_id: 'store5',
-//   api_token: 'yesguy',
-//   test: true
-// });
-
-// monerisHt.send({
-//   type: 'purchase',
-//   crypt_type: 7,
-//   order_id: Math.random(),
-//   amount: '1.0',
-//   pan: '5454545454545454',
-//   expdate: '2102',
-//   description: `Test purchase`,
-//   cust_id: '1234',
-//   cvd_info_1: {
-//     cvd_indicator: "1",
-//     cvd_value: '123',
-//   }
-// }).then((result:any)=>{ //APPROVED
-//   console.log(result);
-// })
-// .catch((err:any)=>{ //DECLINED
-// //err.raw = undefined;//comment out if you want the raw response.
-// console.log('--');
-// console.log('Clean Response (failed):');
-// console.log(err);
-// //console.log(err.raw);
-// })

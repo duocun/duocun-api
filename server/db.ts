@@ -9,7 +9,7 @@ export class DB {
   }
 
   init(cfg: any): Promise<MongoClient>{
-    const connectionStr = 'mongodb://'+ cfg.HOST + ':' + cfg.PORT + '/' + cfg.NAME;
+    const connectionStr = `mongodb://${cfg.USERNAME}:${cfg.PASSWORD}@${cfg.HOST}:${cfg.PORT}/${cfg.NAME}?authSource=admin`;
     const options = {
       poolSize: cfg.POOL_SIZE,
       useNewUrlParser: true,

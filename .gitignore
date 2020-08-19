@@ -27,3 +27,7 @@ client/package-lock.json
 client/src/environments
 /*-audit.json
 /package-lock.json
+.env.local
+.env.test
+.env.development
+.env.production
