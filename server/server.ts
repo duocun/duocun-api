@@ -98,7 +98,7 @@ const apimw = new ApiMiddleWare();
 const utils = new Utils();
 const cfg = new Config();
 
-const SVC_PATH = cfg.SERVER.SVC_PATH;
+const SVC_PATH = cfg.SERVER.SVC_PATH === '/' ? '' : cfg.SERVER.SVC_PATH;
 
 const app = express();
 
@@ -174,20 +174,20 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   // app.get('/wechatRefreshAccessToken', (req, res) => {
   //   utils.refreshWechatAccessToken(req, res);
   // });
-  app.get("/" + SVC_PATH + "/geocodeLocations", (req, res) => {
+  app.get(SVC_PATH + "/geocodeLocations", (req, res) => {
     utils.getGeocodeLocationList(req, res);
   });
 
-  app.get("/" + SVC_PATH + "/places", (req, res) => {
+  app.get(SVC_PATH + "/places", (req, res) => {
     utils.getPlaces(req, res);
   });
 
-  app.get("/" + SVC_PATH + "/users", (req, res) => {
+  app.get(SVC_PATH + "/users", (req, res) => {
     const t = 1;
   });
 
   app.post(
-    "/" + SVC_PATH + "/files/upload",
+    SVC_PATH + "/files/upload",
     upload.single("file"),
     (req, res) => {
       const product = new Product(dbo);
@@ -200,7 +200,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   // });
 
   app.post(
-    "/" + SVC_PATH + "/files/upload",
+    SVC_PATH + "/files/upload",
     upload.single("file"),
     (req, res, next) => {
       res.send("upload file success");
@@ -215,47 +215,47 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   }
 
   // app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  app.use("/" + SVC_PATH + "/Accounts", AccountRouter(dbo));
-  app.use("/" + SVC_PATH + "/Merchants", MerchantRouter(dbo));
-  app.use("/" + SVC_PATH + "/Restaurants", MerchantRouter(dbo)); // deprecated
-  app.use("/" + SVC_PATH + "/Areas", AreaRouter(dbo));
-  app.use("/" + SVC_PATH + "/Transactions", TransactionRouter(dbo));
-  app.use("/" + SVC_PATH + "/Categories", CategoryRouter(dbo));
-  app.use("/" + SVC_PATH + "/Products", ProductRouter(dbo));
-  app.use("/" + SVC_PATH + "/Pages", PageRouter(dbo));
+  app.use(SVC_PATH + "/Accounts", AccountRouter(dbo));
+  app.use(SVC_PATH + "/Merchants", MerchantRouter(dbo));
+  app.use(SVC_PATH + "/Restaurants", MerchantRouter(dbo)); // deprecated
+  app.use(SVC_PATH + "/Areas", AreaRouter(dbo));
+  app.use(SVC_PATH + "/Transactions", TransactionRouter(dbo));
+  app.use(SVC_PATH + "/Categories", CategoryRouter(dbo));
+  app.use(SVC_PATH + "/Products", ProductRouter(dbo));
+  app.use(SVC_PATH + "/Pages", PageRouter(dbo));
 
-  app.use("/" + SVC_PATH + "/Tools", ToolRouter(dbo));
-  app.use("/" + SVC_PATH + "/Contacts", ContactRouter(dbo));
-  app.use("/" + SVC_PATH + "/Ranges", RangeRouter(dbo));
-  app.use("/" + SVC_PATH + "/Malls", MallRouter(dbo));
-  app.use("/" + SVC_PATH + "/Locations", LocationRouter(dbo));
-  app.use("/" + SVC_PATH + "/Pickups", PickupRouter(dbo));
-  app.use("/" + SVC_PATH + "/Drivers", DriverRouter(dbo));
+  app.use(SVC_PATH + "/Tools", ToolRouter(dbo));
+  app.use(SVC_PATH + "/Contacts", ContactRouter(dbo));
+  app.use(SVC_PATH + "/Ranges", RangeRouter(dbo));
+  app.use(SVC_PATH + "/Malls", MallRouter(dbo));
+  app.use(SVC_PATH + "/Locations", LocationRouter(dbo));
+  app.use(SVC_PATH + "/Pickups", PickupRouter(dbo));
+  app.use(SVC_PATH + "/Drivers", DriverRouter(dbo));
 
-  app.use("/" + SVC_PATH + "/Distances", DistanceRouter(dbo));
-  app.use("/" + SVC_PATH + "/Regions", RegionRouter(dbo));
-  app.use("/" + SVC_PATH + "/Orders", OrderRouter(dbo));
-  app.use("/" + SVC_PATH + "/MerchantPayments", MerchantPaymentRouter(dbo));
-  app.use("/" + SVC_PATH + "/MerchantBalances", MerchantBalanceRouter(dbo));
+  app.use(SVC_PATH + "/Distances", DistanceRouter(dbo));
+  app.use(SVC_PATH + "/Regions", RegionRouter(dbo));
+  app.use(SVC_PATH + "/Orders", OrderRouter(dbo));
+  app.use(SVC_PATH + "/MerchantPayments", MerchantPaymentRouter(dbo));
+  app.use(SVC_PATH + "/MerchantBalances", MerchantBalanceRouter(dbo));
   app.use(
-    "/" + SVC_PATH + "/MerchantSchedules",
+    SVC_PATH + "/MerchantSchedules",
     MerchantScheduleRouter(dbo)
   );
-  app.use("/" + SVC_PATH + "/MallSchedules", MallScheduleRouter(dbo));
+  app.use(SVC_PATH + "/MallSchedules", MallScheduleRouter(dbo));
 
-  app.use("/" + SVC_PATH + "/ClientPayments", ClientPaymentRouter(dbo));
-  app.use("/" + SVC_PATH + "/DriverPayments", DriverPaymentRouter(dbo));
-  app.use("/" + SVC_PATH + "/DriverBalances", DriverBalanceRouter(dbo));
+  app.use(SVC_PATH + "/ClientPayments", ClientPaymentRouter(dbo));
+  app.use(SVC_PATH + "/DriverPayments", DriverPaymentRouter(dbo));
+  app.use(SVC_PATH + "/DriverBalances", DriverBalanceRouter(dbo));
 
-  app.use("/" + SVC_PATH + "/OrderSequences", OrderSequenceRouter(dbo));
-  app.use("/" + SVC_PATH + "/DriverHours", DriverHourRouter(dbo));
-  app.use("/" + SVC_PATH + "/DriverShifts", DriverShiftRouter(dbo));
-  app.use("/" + SVC_PATH + "/DriverSchedules", DriverScheduleRouter(dbo));
-  app.use("/" + SVC_PATH + "/Logs", LogRouter(dbo));
-  app.use("/" + SVC_PATH + "/EventLogs", EventLogRouter(dbo));
-  app.use("/" + SVC_PATH + "/Messages", ChatMessageRouter(dbo));
+  app.use(SVC_PATH + "/OrderSequences", OrderSequenceRouter(dbo));
+  app.use(SVC_PATH + "/DriverHours", DriverHourRouter(dbo));
+  app.use(SVC_PATH + "/DriverShifts", DriverShiftRouter(dbo));
+  app.use(SVC_PATH + "/DriverSchedules", DriverScheduleRouter(dbo));
+  app.use(SVC_PATH + "/Logs", LogRouter(dbo));
+  app.use(SVC_PATH + "/EventLogs", EventLogRouter(dbo));
+  app.use(SVC_PATH + "/Messages", ChatMessageRouter(dbo));
 
-  app.use("/" + SVC_PATH + "/CellApplications", CellApplicationRouter(dbo));
+  app.use(SVC_PATH + "/CellApplications", CellApplicationRouter(dbo));
 
   app.use(express.static(path.join(__dirname, "/../uploads")));
   app.set("port", cfg.SERVER.SVC_PORT);
