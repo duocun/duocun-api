@@ -30,6 +30,8 @@ deploy:
    on: *2
  
 script:
+   - npm run test
+   - npm run build
    - zip -q -r latest *
    - mkdir -p dpl_cd_upload
    - mv latest.zip dpl_cd_upload/latest.zip
