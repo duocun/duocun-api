@@ -8,50 +8,51 @@ export class ApiMiddleWare {
   auth(req: Request, res: Response, next: any) {
     let token = req.get("Authorization") || "";
     token = token.replace("Bearer ", "");
-
+    const cfg = new Config();
     if (
-      req.path === "/api/Accounts/wxLogin" ||
-      req.path === "/api/Accounts/wechatLogin" ||
-      req.path === "/api/Accounts/login" ||
-      req.path === "/api/Accounts/signup" ||
-      req.path === "/api/Accounts/logout" ||
-      req.path === "/api/Accounts/loginByPhone" ||
-      req.path === "/api/Accounts/verifyCode" ||
-      req.path === "/api/Accounts/sendVerifyMsg" ||
-      req.path === "/api/Accounts/sendOTPCode" ||
-      req.path === "/api/Accounts/verifyAndLogin" ||
-      req.path === "/api/Accounts/registerTempAccount" ||
-      req.path === "/api/Accounts/register" ||
-      req.path === "/api/Accounts/googleLogin" ||
-      req.path === "/api/Accounts/fbLogin" ||
-      req.path === "/api/Accounts/googleSignUp" ||
-      req.path.indexOf("/api/Accounts/wechatLoginByOpenId") !== -1 ||
-      req.path.indexOf("/api/Accounts/wechatLoginByCode") !== -1 ||
-      req.path === "/api/Categories/G" ||
-      req.path === "/api/Pages/loadTabs" ||
-      req.path === "/api/Areas/G/my" ||
-      req.path === "/api/EventLogs" ||
-      (req.path && req.path.startsWith("/api/Pages/page")) ||
-      req.path === "/api/MerchantSchedules/availableMerchants" ||
-      (req.method === "GET" && req.path.indexOf("/api/Accounts") !== -1) ||
-      req.path.indexOf("/api/Locations") !== -1 ||
-      req.path.indexOf("/api/Restaurants") !== -1 ||
-      req.path.indexOf("/api/Products") !== -1 ||
-      req.path === "/api/Restaurants" ||
-      req.path === "/api/Restaurants/qFind" ||
-      req.path === "/api/Restaurants/load" ||
-      req.path === "/api/Products" ||
-      req.path === "/api/Products/qFind" ||
-      req.path === "/api/Products/categorize" ||
-      (req.path.includes("/api/products") && req.method == "GET") ||
-      req.path === "/api/Pages/loadTabs" ||
-      req.path === "/api/Ranges" ||
-      req.path === "/api/Ranges/overRange" ||
-      req.path === "/api/Ranges/inRange" ||
-      req.path === "/api/ClientPayments/notify" ||
-      req.path === "/api/ClientPayments/alphapay/success" ||
-      req.path.indexOf("/api/Messages") !== -1 ||
-      (req.path.includes("/api/Categories/G") && req.method == "GET") ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/wxLogin` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/wechatLogin` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/login` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/signup` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/logout` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/loginByPhone` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/verifyCode` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/sendVerifyMsg` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/sendOTPCode` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/verifyAndLogin` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/registerTempAccount` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/register` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/googleLogin` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/fbLogin` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Accounts/googleSignUp` ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Accounts/wechatLoginByOpenId`) !== -1 ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Accounts/wechatLoginByCode`) !== -1 ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Categories/G` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Pages/loadTabs` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Areas/G/my` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/EventLogs` ||
+      // (req.path && req.path.startsWith(`/${cfg.SERVER.SVC_PATH}/Pages/page`)) ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/MerchantSchedules/availableMerchants` ||
+      // (req.method === "GET" && req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Accounts`) !== -1) ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Locations`) !== -1 ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Restaurants`) !== -1 ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Products`) !== -1 ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Restaurants` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Restaurants/qFind` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Restaurants/load` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Products` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Products/qFind` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Products/categorize` ||
+      // (req.path.includes(`/${cfg.SERVER.SVC_PATH}/products`) && req.method == "GET") ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Pages/loadTabs` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges/overRange` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges/inRange` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/ClientPayments/notify` ||
+      // req.path === `/${cfg.SERVER.SVC_PATH}/ClientPayments/alphapay/success` ||
+      // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Messages`) !== -1 ||
+      req.path.indexOf(`${cfg.SERVER.SVC_PATH}`) !== -1 ||
+      // (req.path.includes(`/${cfg.SERVER.SVC_PATH}/Categories/G`) && req.method == "GET") ||
       req.path.includes(".jpeg") ||
       req.path.includes(".jpg") ||
       req.path.includes(".png")
@@ -59,7 +60,7 @@ export class ApiMiddleWare {
       next();
     } else {
       res.setHeader("Content-Type", "application/json");
-      const cfg = new Config();
+      
       if (token) {
         try {
           let accountId: any = jwt.verify(token, cfg.JWT.SECRET);

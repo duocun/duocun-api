@@ -98,7 +98,7 @@ const apimw = new ApiMiddleWare();
 const utils = new Utils();
 const cfg = new Config();
 
-const ROUTE_PREFIX = cfg.SERVER.ROUTE_PREFIX;
+const SVC_PATH = cfg.SERVER.SVC_PATH;
 
 const app = express();
 
@@ -174,18 +174,20 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   // app.get('/wechatRefreshAccessToken', (req, res) => {
   //   utils.refreshWechatAccessToken(req, res);
   // });
-  app.get("/" + ROUTE_PREFIX + "/geocodeLocations", (req, res) => {
+  app.get("/" + SVC_PATH + "/geocodeLocations", (req, res) => {
     utils.getGeocodeLocationList(req, res);
   });
 
-  app.get("/" + ROUTE_PREFIX + "/places", (req, res) => {
+  app.get("/" + SVC_PATH + "/places", (req, res) => {
     utils.getPlaces(req, res);
   });
 
-  app.get("/" + ROUTE_PREFIX + "/users", (req, res) => {});
+  app.get("/" + SVC_PATH + "/users", (req, res) => {
+    const t = 1;
+  });
 
   app.post(
-    "/" + ROUTE_PREFIX + "/files/upload",
+    "/" + SVC_PATH + "/files/upload",
     upload.single("file"),
     (req, res) => {
       const product = new Product(dbo);
@@ -193,12 +195,12 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
     }
   );
 
-  // app.get('/' + ROUTE_PREFIX + '/Pictures', (req, res) => {
+  // app.get('/' + SVC_PATH + '/Pictures', (req, res) => {
   //   picture.get(req, res);
   // });
 
   app.post(
-    "/" + ROUTE_PREFIX + "/files/upload",
+    "/" + SVC_PATH + "/files/upload",
     upload.single("file"),
     (req, res, next) => {
       res.send("upload file success");
@@ -213,52 +215,53 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   }
 
   // app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  app.use("/" + ROUTE_PREFIX + "/Accounts", AccountRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Merchants", MerchantRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Restaurants", MerchantRouter(dbo)); // deprecated
-  app.use("/" + ROUTE_PREFIX + "/Areas", AreaRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Transactions", TransactionRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Categories", CategoryRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Products", ProductRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Pages", PageRouter(dbo));
+  app.use("/" + SVC_PATH + "/Accounts", AccountRouter(dbo));
+  app.use("/" + SVC_PATH + "/Merchants", MerchantRouter(dbo));
+  app.use("/" + SVC_PATH + "/Restaurants", MerchantRouter(dbo)); // deprecated
+  app.use("/" + SVC_PATH + "/Areas", AreaRouter(dbo));
+  app.use("/" + SVC_PATH + "/Transactions", TransactionRouter(dbo));
+  app.use("/" + SVC_PATH + "/Categories", CategoryRouter(dbo));
+  app.use("/" + SVC_PATH + "/Products", ProductRouter(dbo));
+  app.use("/" + SVC_PATH + "/Pages", PageRouter(dbo));
 
-  app.use("/" + ROUTE_PREFIX + "/Tools", ToolRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Contacts", ContactRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Ranges", RangeRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Malls", MallRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Locations", LocationRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Pickups", PickupRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Drivers", DriverRouter(dbo));
+  app.use("/" + SVC_PATH + "/Tools", ToolRouter(dbo));
+  app.use("/" + SVC_PATH + "/Contacts", ContactRouter(dbo));
+  app.use("/" + SVC_PATH + "/Ranges", RangeRouter(dbo));
+  app.use("/" + SVC_PATH + "/Malls", MallRouter(dbo));
+  app.use("/" + SVC_PATH + "/Locations", LocationRouter(dbo));
+  app.use("/" + SVC_PATH + "/Pickups", PickupRouter(dbo));
+  app.use("/" + SVC_PATH + "/Drivers", DriverRouter(dbo));
 
-  app.use("/" + ROUTE_PREFIX + "/Distances", DistanceRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Regions", RegionRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Orders", OrderRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/MerchantPayments", MerchantPaymentRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/MerchantBalances", MerchantBalanceRouter(dbo));
+  app.use("/" + SVC_PATH + "/Distances", DistanceRouter(dbo));
+  app.use("/" + SVC_PATH + "/Regions", RegionRouter(dbo));
+  app.use("/" + SVC_PATH + "/Orders", OrderRouter(dbo));
+  app.use("/" + SVC_PATH + "/MerchantPayments", MerchantPaymentRouter(dbo));
+  app.use("/" + SVC_PATH + "/MerchantBalances", MerchantBalanceRouter(dbo));
   app.use(
-    "/" + ROUTE_PREFIX + "/MerchantSchedules",
+    "/" + SVC_PATH + "/MerchantSchedules",
     MerchantScheduleRouter(dbo)
   );
-  app.use("/" + ROUTE_PREFIX + "/MallSchedules", MallScheduleRouter(dbo));
+  app.use("/" + SVC_PATH + "/MallSchedules", MallScheduleRouter(dbo));
 
-  app.use("/" + ROUTE_PREFIX + "/ClientPayments", ClientPaymentRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/DriverPayments", DriverPaymentRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/DriverBalances", DriverBalanceRouter(dbo));
+  app.use("/" + SVC_PATH + "/ClientPayments", ClientPaymentRouter(dbo));
+  app.use("/" + SVC_PATH + "/DriverPayments", DriverPaymentRouter(dbo));
+  app.use("/" + SVC_PATH + "/DriverBalances", DriverBalanceRouter(dbo));
 
-  app.use("/" + ROUTE_PREFIX + "/OrderSequences", OrderSequenceRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/DriverHours", DriverHourRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/DriverShifts", DriverShiftRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/DriverSchedules", DriverScheduleRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Logs", LogRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/EventLogs", EventLogRouter(dbo));
-  app.use("/" + ROUTE_PREFIX + "/Messages", ChatMessageRouter(dbo));
+  app.use("/" + SVC_PATH + "/OrderSequences", OrderSequenceRouter(dbo));
+  app.use("/" + SVC_PATH + "/DriverHours", DriverHourRouter(dbo));
+  app.use("/" + SVC_PATH + "/DriverShifts", DriverShiftRouter(dbo));
+  app.use("/" + SVC_PATH + "/DriverSchedules", DriverScheduleRouter(dbo));
+  app.use("/" + SVC_PATH + "/Logs", LogRouter(dbo));
+  app.use("/" + SVC_PATH + "/EventLogs", EventLogRouter(dbo));
+  app.use("/" + SVC_PATH + "/Messages", ChatMessageRouter(dbo));
 
-  app.use("/" + ROUTE_PREFIX + "/CellApplications", CellApplicationRouter(dbo));
+  app.use("/" + SVC_PATH + "/CellApplications", CellApplicationRouter(dbo));
 
   app.use(express.static(path.join(__dirname, "/../uploads")));
-  app.set("port", process.env.PORT || cfg.SERVER.PORT);
+  app.set("port", cfg.SERVER.SVC_PORT);
 
   const server = app.listen(app.get("port"), () => {
+    console.log(`server path: ${cfg.SERVER.SVC_PATH}`);
     console.log("API is running on :%d/n", app.get("port"));
   });
 
