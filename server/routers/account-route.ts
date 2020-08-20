@@ -24,6 +24,7 @@ export function AccountRouter(db: DB) {
   // v2 https://duocun.ca/api/Accounts/wechatLoginByOpenId
   router.post('/wechatLoginByOpenId', (req, res) => { controller.wechatLoginByOpenId(req, res); });
   router.get('/wechatLoginByCode', (req, res) => { controller.wechatLoginByCode(req, res); });
+  router.get('/wechatSignup', (req, res) => {controller.wechatSignup(req, res); });
   router.get('/qFind', (req, res) => { controller.list(req, res); }); // deprecated
   router.get('/', (req, res) => { controller.list(req, res); });
   router.get('/current', (req, res) => { controller.getCurrentAccount(req, res); });
@@ -107,6 +108,20 @@ export class AccountController extends Model {
     this.accountModel.doLogin(username, password).then((tokenId: string) => {
       res.setHeader('Content-Type', 'application/json');
       res.send(JSON.stringify(tokenId, null, 3));
+    });
+  }
+
+  wechatSignup(req: Request, res: Response){
+    const {openid, nickname, headimgurl, sex} = req.body;
+    this.accountModel.doWechatSignup(openid, nickname, headimgurl, sex).then((account: IAccount) => {
+      res.setHeader('Content-Type', 'application/json');
+      if (account) {
+        const accountId = account._id.toString();
+        const tokenId = this.accountModel.jwtSign(accountId);
+        res.send(JSON.stringify(tokenId, null, 3));
+      } else {
+        res.send(JSON.stringify('', null, 3));
+      }
     });
   }
 
