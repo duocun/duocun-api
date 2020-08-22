@@ -14,7 +14,7 @@ const s3 = new AWS.S3({
   secretAccessKey: cfg.AWS_S3.ACCESS_KEY,
 });
 
-export let SocketIO: socketio.Server|null = null;
+export let SocketIO: socketio.Server | null = null;
 
 export default (server: any, db: DB) => {
   if (SocketIO) {
@@ -43,12 +43,13 @@ export default (server: any, db: DB) => {
     });
 
     socket.on("payment_init", async (data) => {
+      console.log("payment init");
       const { token } = data;
-      let { accountId } = <any> jwt.verify(token, cfg.JWT.SECRET);
+      let { accountId } = <any>jwt.verify(token, cfg.JWT.SECRET);
       const room = `payment:${accountId}`;
       logger.info("Payment socket inited, Room ID: " + room);
       socket.join(room);
-      const payload = { foo: "bar" };
+      io.to(room).emit("connected_to_payment");
     });
 
     socket.on("admin_send", async (data) => {
