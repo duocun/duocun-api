@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { Config } from "./config";
 
+const SVC_PATH = process.env.ENV === 'localhost' ? process.env.SVC_PATH : '';
+
 export class ApiMiddleWare {
   constructor(options?: any) {}
 
