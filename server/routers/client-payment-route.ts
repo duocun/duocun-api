@@ -677,7 +677,7 @@ export class ClientPaymentController extends Controller {
         description,
         price: Number((total * 100).toFixed(0)),
         currency: CurrencyType.CAD,
-        notify_url: `${process.env.BACKEND_URL}/api/ClientPayments/alphapay/success`,
+        notify_url: `${process.env.BACKEND_URL}/ClientPayments/alphapay/success`,
         //@ts-ignore
         channel
       };

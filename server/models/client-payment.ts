@@ -34,6 +34,9 @@ const TD_BANK_NAME = "TD Bank";
 const SNAPPAY_BANK_ID = "5e60139810cc1f34dea85349";
 const SNAPPAY_BANK_NAME = "SnapPay Bank";
 
+const SNAPPAY_NOTIFY_URL = process.env.SNAPPAY_NOTIFY_URL; //"https://api.duocun.ca/v1/ClientPayments/notify"; // https://duocun.com.cn/api/ClientPayments/notify
+const SNAPPAY_RETURN_URL = process.env.SNAPPAY_RETURN_URL; // "https://www.duocun.ca";
+
 // var fs = require('fs');
 // var util = require('util');
 // // var log_file = fs.createWriteStream('~/duocun-debug.log', {flags : 'w'}); // __dirname +
@@ -207,8 +210,8 @@ export class ClientPayment extends Model {
     // const notify_url = app ? app.notifyUrl : ''; // 'https://duocun.com.cn/api/ClientPayments/notify';
     // const returnUrl = app ? app.returnUrls.find((r: any) => r.action === paymentActionCode) : { url: '' }; 'https://duocun.ca/grocery?p=h&cId='
     // const return_url = returnUrl.url + accountId; // 'https://duocun.ca/grocery?p=h&cId=' + accountId;
-    const return_url = returnUrl ? returnUrl : "https://duocun.ca/grocery?p=h&cId=" + accountId;
-    const notify_url = "https://duocun.com.cn/api/ClientPayments/notify";
+    const return_url = returnUrl ? returnUrl : `${SNAPPAY_RETURN_URL}?p=h&cId=${accountId}`;
+    const notify_url = SNAPPAY_NOTIFY_URL; // "https://duocun.com.cn/api/ClientPayments/notify";
     const trans_amount = Math.round(amount * 100) / 100;
 
     return {
