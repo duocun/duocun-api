@@ -4,12 +4,13 @@ import { ObjectID, ObjectId } from "mongodb";
 import { Request, Response } from "express";
 import { Account, IAccount } from "./account";
 import moment from 'moment';
-import { IOrderItem, PaymentMethod } from "./order";
+import { IOrderItem, PaymentMethod, Order } from "./order";
 import { EventLog } from "./event-log";
 import { ResponseStatus } from "./client-payment";
 
 import fs from 'fs';
 import { AccountType } from "./log";
+import { Product } from "./product";
 
 const CASH_BANK_ID = '5c9511bb0851a5096e044d10';
 const CASH_BANK_NAME = 'Cash Bank';
@@ -17,7 +18,6 @@ const TD_BANK_ID = '5c95019e0851a5096e044d0c';
 const TD_BANK_NAME = 'TD Bank';
 const SNAPPAY_BANK_ID = '5e60139810cc1f34dea85349';
 const SNAPPAY_BANK_NAME = 'SnapPay Bank';
-
 
 
 export const TransactionAction = {
@@ -96,8 +96,10 @@ export interface IDbTransaction {
 export class Transaction extends Model {
   private accountModel: Account;
   eventLogModel: EventLog;
+  private dbo: DB;
   constructor(dbo: DB) {
     super(dbo, 'transactions');
+    this.dbo = dbo;
     this.accountModel = new Account(dbo);
     this.eventLogModel = new EventLog(dbo);
   }
@@ -115,25 +117,34 @@ export class Transaction extends Model {
     return ts;
   }
 
-  listV2(req: Request, res: Response) {
-    let query = null;
-    let fields;
-    if (req.headers && req.headers.filter && typeof req.headers.filter === 'string') {
-      query = (req.headers && req.headers.filter) ? JSON.parse(req.headers.filter) : null;
-    }
-    if (req.headers && req.headers.fields && typeof req.headers.fields === 'string') {
-      fields = (req.headers && req.headers.fields) ? JSON.parse(req.headers.fields) : null;
-    }
+  async loadPageV2(clientId: string, itemsPerPage: number, currentPageNumber: number) {
+    const query = { $or: [{ fromId: clientId }, { toId: clientId }], amount: { $ne: 0 } };
 
-    this.joinFindV2(query).then((rs: IDBTransaction[]) => {
-      res.setHeader('Content-Type', 'application/json');
-      if (rs) {
-        res.send(JSON.stringify(rs, null, 3));
+    const rs = await this.find(query);
+    const arrSorted = rs.sort((a: any, b: any) => {
+      const aMoment = moment(a.created);
+      const bMoment = moment(b.created); // .set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+      if (aMoment.isAfter(bMoment)) {
+        return -1;
       } else {
-        res.send(JSON.stringify(null, null, 3))
+        return 1;
       }
     });
+
+    const start = (currentPageNumber - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const len = arrSorted.length;
+    const arr = arrSorted.slice(start, end);
+
+    if (arr && arr.length > 0) {
+      return { total: len, transactions: arr };
+    } else {
+      return { total: len, transactions: [] };
+    }
   }
+
+
+
   // v1
   // use in admin, $in
   list(req: Request, res: Response) {
@@ -142,7 +153,7 @@ export class Transaction extends Model {
       query = (req.headers && req.headers.filter) ? JSON.parse(req.headers.filter) : null;
     }
 
-    this.find(query).then((rs: IDBTransaction[]) => {
+    this.find(query).then((rs: any[]) => {
       res.setHeader('Content-Type', 'application/json');
       if (rs) {
         res.send(JSON.stringify(rs, null, 3));
@@ -152,25 +163,29 @@ export class Transaction extends Model {
     });
   }
 
+  // update balance of debit and credit
   async doInsertOne(tr: ITransaction) {
     const fromId: string = tr.fromId; // must be account id
     const toId: string = tr.toId;     // must be account id
-    const amount: number = tr.amount;
-    const accountQuery = { _id: { $in: [fromId, toId] } };
-    const accounts = await this.accountModel.find(accountQuery);
-    const fromAccount: any = accounts.find(x => x._id.toString() === fromId);
-    const toAccount: any = accounts.find(x => x._id.toString() === toId);
+    const amount: number = Math.round(tr.amount * 100)/100;
+
+    const fromAccount: any = await this.accountModel.findOne({ _id: fromId });
+    const toAccount: any = await this.accountModel.findOne({ _id: toId });
 
     if (fromAccount && toAccount) {
-      tr.fromBalance = Math.round((fromAccount.balance + amount) * 100) / 100;
-      tr.toBalance = Math.round((toAccount.balance - amount) * 100) / 100;
+      const fromBalance = isNaN(fromAccount.balance) ? 0 : fromAccount.balance;
+      const toBalance = isNaN(toAccount.balance) ? 0 : toAccount.balance;
+      tr.amount = amount;
+      tr.fromBalance = Math.round((fromBalance + amount) * 100) / 100;
+      tr.toBalance = Math.round((toBalance - amount) * 100) / 100;
 
       const x = await this.insertOne(tr);
       const updates = [
         { query: { _id: fromId }, data: { balance: tr.fromBalance } },
         { query: { _id: toId }, data: { balance: tr.toBalance } }
       ];
-
+      // console.log(`update transactions from:${fromAccount.username}, balance:${fromAccount.balance}, amount:${amount}, newBalance:${tr.fromBalance}, action:${tr.actionCode}`);
+      // console.log(`update transactions to:${toAccount.username}, balance:${toAccount.balance}, amount:${amount}, newBalance:${tr.toBalance}, action:${tr.actionCode}`);
       await this.accountModel.bulkUpdate(updates);
       return x;
     } else {
@@ -194,76 +209,71 @@ export class Transaction extends Model {
   }
 
 
-  saveTransactionsForPlaceOrder(orderId: string, orderType: string, merchantAccountId: string, merchantName: string,
-    clientId: string, clientName: string, cost: number, total: number, delivered: string): Promise<string> {
+  async saveTransactionsForPlaceOrder(orderId: string, orderType: string, merchantAccountId: string, merchantName: string,
+    clientId: string, clientName: string, cost: number, total: number, delivered: string): Promise<any> {
 
-    return new Promise((resolve, reject) => {
-      const t1: ITransaction = {
-        fromId: merchantAccountId,
-        fromName: merchantName,
-        toId: CASH_BANK_ID,
-        toName: clientName,
-        actionCode: TransactionAction.ORDER_FROM_MERCHANT.code, // 'duocun order from merchant',
-        amount: Math.round(cost * 100) / 100,
-        orderId: orderId,
-        orderType: orderType,
-        delivered: delivered,
-      };
+    const t1: ITransaction = {
+      fromId: merchantAccountId,
+      fromName: merchantName,
+      toId: CASH_BANK_ID,
+      toName: clientName,
+      actionCode: TransactionAction.ORDER_FROM_MERCHANT.code, // 'duocun order from merchant',
+      amount: Math.round(cost * 100) / 100,
+      orderId: orderId,
+      orderType: orderType,
+      delivered: delivered,
+    };
 
-      const t2: ITransaction = {
-        fromId: CASH_BANK_ID,
-        fromName: merchantName,
-        toId: clientId,
-        toName: clientName,
-        amount: Math.round(total * 100) / 100,
-        actionCode: TransactionAction.ORDER_FROM_DUOCUN.code, // 'client order from duocun',
-        orderId: orderId,
-        orderType: orderType,
-        delivered: delivered,
-      };
+    const t2: ITransaction = {
+      fromId: CASH_BANK_ID,
+      fromName: merchantName,
+      toId: clientId,
+      toName: clientName,
+      amount: Math.round(total * 100) / 100,
+      actionCode: TransactionAction.ORDER_FROM_DUOCUN.code, // 'client order from duocun',
+      orderId: orderId,
+      orderType: orderType,
+      delivered: delivered,
+    };
 
-      this.doInsertOne(t1).then((x) => {
-        this.doInsertOne(t2).then((y) => {
-          resolve();
-        });
-      });
-    });
+    await this.doInsertOne(t1);
+    // console.log(`Add transactions for order Id:${orderId}, merchant`);
+    await this.doInsertOne(t2);
+    // console.log(`Add transactions for order Id:${orderId}, client: ${clientName}, amount:${t2.amount}`);
+    return;
   }
 
 
-  saveTransactionsForRemoveOrder(orderId: string, merchantAccountId: string, merchantName: string, clientId: string, clientName: string,
+  // add cancel transactions for merchant and client
+  async saveTransactionsForRemoveOrder(orderId: string, merchantAccountId: string, merchantName: string, clientId: string, clientName: string,
     cost: number, total: number, delivered: string, items: IOrderItem[]) {
 
-    return new Promise((resolve, reject) => {
-      const t1: ITransaction = {
-        fromId: CASH_BANK_ID,
-        fromName: clientName,
-        toId: merchantAccountId,
-        toName: merchantName,
-        actionCode: TransactionAction.CANCEL_ORDER_FROM_MERCHANT.code, // 'duocun cancel order from merchant',
-        amount: Math.round(cost * 100) / 100,
-        orderId: orderId,
-        items: items,
-        delivered: delivered
-      };
+    const t1: ITransaction = {
+      fromId: CASH_BANK_ID,
+      fromName: clientName,
+      toId: merchantAccountId,
+      toName: merchantName,
+      actionCode: TransactionAction.CANCEL_ORDER_FROM_MERCHANT.code, // 'duocun cancel order from merchant',
+      amount: Math.round(cost * 100) / 100,
+      orderId: orderId,
+      items: items,
+      delivered: delivered
+    };
 
-      const t2: ITransaction = {
-        fromId: clientId,
-        fromName: clientName,
-        toId: CASH_BANK_ID,
-        toName: merchantName,
-        amount: Math.round(total * 100) / 100,
-        actionCode: TransactionAction.CANCEL_ORDER_FROM_DUOCUN.code, // 'client cancel order from duocun',
-        orderId: orderId,
-        delivered: delivered
-      };
+    const t2: ITransaction = {
+      fromId: clientId,
+      fromName: clientName,
+      toId: CASH_BANK_ID,
+      toName: merchantName,
+      amount: Math.round(total * 100) / 100,
+      actionCode: TransactionAction.CANCEL_ORDER_FROM_DUOCUN.code, // 'client cancel order from duocun',
+      orderId: orderId,
+      delivered: delivered
+    };
 
-      this.doInsertOne(t1).then((x) => {
-        this.doInsertOne(t2).then((y) => {
-          resolve();
-        });
-      });
-    });
+    await this.doInsertOne(t1);
+    await this.doInsertOne(t2);
+    return;
   }
 
   doGetSales() {
@@ -421,7 +431,9 @@ export class Transaction extends Model {
 
   }
 
-  loadPage(req: Request, res: Response) {
+  async loadPage(req: Request, res: Response) {
+    const orderModel = new Order(this.dbo);
+    const productModel = new Product(this.dbo);
     const itemsPerPage = +req.params.itemsPerPage;
     const currentPageNumber = +req.params.currentPageNumber;
 
@@ -430,30 +442,55 @@ export class Transaction extends Model {
       query = (req.headers && req.headers.filter) ? JSON.parse(req.headers.filter) : null;
     }
 
-    this.find(query).then((rs: any) => {
-      const arrSorted = rs.sort((a: any, b: any) => {
-        const aMoment = moment(a.created);
-        const bMoment = moment(b.created); // .set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
-        if (aMoment.isAfter(bMoment)) {
-          return -1;
-        } else {
-          return 1;
-        }
-      });
-
-      const start = (currentPageNumber - 1) * itemsPerPage;
-      const end = start + itemsPerPage;
-      const len = arrSorted.length;
-      const arr = arrSorted.slice(start, end);
-
-      res.setHeader('Content-Type', 'application/json');
-      if (arr && arr.length > 0) {
-        res.send(JSON.stringify({ total: len, transactions: arr }, null, 3));
+    const rs: any = await this.find(query);
+    const arrSorted = rs.sort((a: any, b: any) => {
+      const aMoment = moment(a.created);
+      const bMoment = moment(b.created); // .set({ hour: 0, minute: 0, second: 0, millisecond: 0 });
+      if (aMoment.isAfter(bMoment)) {
+        return -1;
       } else {
-        res.send(JSON.stringify({ total: len, transactions: [] }, null, 3));
+        return 1;
       }
-
     });
+
+    const start = (currentPageNumber - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const len = arrSorted.length;
+    let arr = arrSorted.slice(start, end);
+    for (let transaction of arr) {
+      if (transaction.paymentId) {
+        transaction.orders = await orderModel.find({ paymentId: transaction.paymentId });
+      } else if (transaction.orderId) {
+        const order = await orderModel.findOne({ _id: transaction.orderId });
+        if (order) {
+          transaction.orders = [order];
+        } else {
+          transaction.orders = [];
+        }
+      }else {
+        transaction.orders = [];
+      }
+      for (let order of transaction.orders) {
+        if (order.items) {
+          for (let item of order.items) {
+            const product = await productModel.findOne({ _id: item.productId });
+            if (product) {
+              item.name = product.name;
+              item.nameEN = product.nameEN;
+            } else {
+              item.name = "删除的产品";
+              item.nameEN = "Deleted product";
+            }
+          }
+        }
+      }
+    }
+    res.setHeader('Content-Type', 'application/json');
+    if (arr && arr.length > 0) {
+      res.send(JSON.stringify({ total: len, transactions: arr }, null, 3));
+    } else {
+      res.send(JSON.stringify({ total: len, transactions: [] }, null, 3));
+    }
   }
 
   groupByDelivered(items: ITransaction[]) {
@@ -634,14 +671,24 @@ export class Transaction extends Model {
   // v2 api
   async updateBalanceList(accountIds: string[]) {
     const self = this;
-    const trs = await this.find({ type: 'user' }); // type: {$in: ['driver', 'client', 'merchant']}
-
-    let list = this.sortTransactions(trs);
+    // const trs = await this.find({}); //  'user'
+    // let list = this.sortTransactions(trs);
 
     for (let i = 0; i < accountIds.length; i++) {
-      const id = accountIds[i];
-      await self.updateBalanceByAccountId(id, list);
+      const accountId = accountIds[i];
+      // const q = { '$or': [{ fromId: accountId }, { toId: accountId }] };
+      console.log(`updating balance for ${accountId}`);
+      // await self.updateBalanceByAccountId(accountId, list);
+      await this.updateBalance(accountId);
     }
+
+    // await accountIds.reduce(async (memo: Promise<any>, accountId) => {
+    //   const retPromise = await memo;
+    //   console.log(`updating balance for ${accountId}`);
+    //   await self.updateBalanceByAccountId(accountId, list);
+    //   return retPromise;
+    // }, new Promise((resolve) => { resolve(0); }));
+
     return accountIds.length;
   }
 
@@ -686,68 +733,70 @@ export class Transaction extends Model {
     return trs.sort((a: any, b: any) => {
       const aMoment = moment(a.created);
       const bMoment = moment(b.created);
-      if (aMoment.isSame(bMoment, 'day')) {
-        if (aMoment.isAfter(bMoment)) {
-          return 1; // a to bottom
-        } else {
-          return -1;
-        }
+      if (aMoment.isAfter(bMoment)) {
+        return 1; // a to bottom
       } else {
-        if (aMoment.isAfter(bMoment)) {
-          return 1;
-        } else {
-          return -1;
-        }
+        return -1;
       }
     });
   }
 
+  async updateBalances(createStart: string, createEnd: string) {
+    const accounts = await this.accountModel.find({
+      created: { $gte: createStart, $lte: createEnd },
+      type: { $in: ['driver', 'client'] }
+    }
+    );
+    const accountIds = accounts.map(account => account._id.toString());
+    await this.updateBalanceList(accountIds);
+    return accounts.length;
+  }
+
   // ----------------------------------------------------
   // update single account
-  updateBalance(accountId: string) {
-    return new Promise((resolve, reject) => {
-      const q = { '$or': [{ fromId: accountId }, { toId: accountId }] };
-      const datas: any[] = [];
+  async updateBalance(accountId: string) {
+    if(!accountId){
+      return;
+    }
+    const q = { '$or': [{ fromId: accountId }, { toId: accountId }] };
+    const datas: any[] = [];
 
-      this.find(q).then(trs => {
+    const trs = await this.find(q);
+    if (trs && trs.length > 0) {
+      let balance = 0;
+      const list = this.sortTransactions(trs);
 
-        if (trs && trs.length > 0) {
-          let balance = 0;
-          let list = this.sortTransactions(trs);
-
-          list.map((t: ITransaction) => {
-            const oId: any = t._id;
-            if (t.fromId.toString() === accountId) {
-              balance += t.amount;
-              datas.push({
-                query: { _id: oId.toString() },
-                data: {
-                  fromBalance: Math.round(balance * 100) / 100
-                }
-              });
-            } else if (t.toId.toString() === accountId) {
-              balance -= t.amount;
-              datas.push({
-                query: { _id: oId.toString() },
-                data: {
-                  toBalance: Math.round(balance * 100) / 100,
-                }
-              });
+      list.forEach((t: ITransaction) => {
+        const oId: any = t._id;
+        if (t.fromId.toString() === accountId) {
+          balance += t.amount;
+          datas.push({
+            query: { _id: oId.toString() },
+            data: {
+              fromBalance: Math.round(balance * 100) / 100
             }
           });
-
-          balance = Math.round(balance * 100) / 100;
-
-          this.bulkUpdate(datas).then(() => {
-            this.accountModel.updateOne({ _id: accountId }, { balance: balance }).then(() => {
-              resolve({ status: ResponseStatus.SUCCESS });
-            });
+          // console.log(`${t.created} ${balance}`);
+        } else if (t.toId.toString() === accountId) {
+          balance -= t.amount;
+          datas.push({
+            query: { _id: oId.toString() },
+            data: {
+              toBalance: Math.round(balance * 100) / 100,
+            }
           });
-        } else {
-          resolve({ status: ResponseStatus.FAIL });
+          // console.log(`${t.created} ${balance}`);
         }
       });
-    });
+
+      balance = Math.round(balance * 100) / 100;
+
+      await this.bulkUpdate(datas);
+      await this.accountModel.updateOne({ _id: accountId }, { balance: balance })
+      return { status: ResponseStatus.SUCCESS };
+    } else {
+      return { status: ResponseStatus.FAIL };
+    }
   }
 
   updateAccount(req: Request, res: Response) {
@@ -758,14 +807,11 @@ export class Transaction extends Model {
     });
   }
 
-  updateBalances(req: Request, res: Response) {
-    const self = this;
-    this.accountModel.find({}, null, ['_id']).then(accounts => {
-      const accountIds = accounts.map(account => account._id.toString());
-      this.updateBalanceList(accountIds).then(n => {
-        res.setHeader('Content-Type', 'application/json');
-        res.send(JSON.stringify('success update ' + n + 'accounts', null, 3));
-      });
+  updateAccountV2(req: Request, res: Response) {
+    const accountId = req.params.id;
+    this.updateBalance(accountId).then((r) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify(r, null, 3));
     });
   }
 }

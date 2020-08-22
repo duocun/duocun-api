@@ -3,34 +3,49 @@ import { Request, Response } from "express";
 import moment from "moment";
 import { DB } from "../db";
 import { Merchant } from "../models/merchant";
-import { ObjectID } from "../../node_modules/@types/mongodb";
+import { Code, Model } from "../models/model";
+import logger from "../lib/logger";
+import { DateTime } from "../models/date-time";
 
-export class MerchantRouter {
-  router = express.Router();
+
+export function MerchantRouter(db: DB){
+  const router = express.Router();
+  const model = new Merchant(db);
+  const controller = new MerchantController(db);
+
+  // The order matters
+  router.get('/G/deliverSchedules', (req, res) => { controller.gv1_getDeliverySchedule(req, res); });
+  router.get('/G/available', (req, res) => { controller.gv1_getAvailableMerchants(req, res); });
+  router.get('/G/:id', (req, res) => { controller.gv1_get(req, res); });
+  router.get('/G/', (req, res) => { controller.gv1_list(req, res); });
+
+  // v2
+  router.get('/v2/myMerchants', (req, res) => { controller.gv1_getAvailableMerchants(req, res); });
+  router.get('/v2/mySchedules', (req, res) => { controller.getMySchedules(req, res); })
+  router.get('/getByAccountId', (req, res) => { controller.getByAccountId(req, res); });
+  router.post('/load', (req, res) => { controller.load(req, res); });
+
+  router.get('/qFind', (req, res) => { model.quickFind(req, res); });
+  router.get('/:id', (req, res) => { model.get(req, res); });
+
+  // food delivery
+  router.get('/', (req, res) => { model.list(req, res); });
+  router.get('/available', (req, res) => { controller.fv1_getAvailableMerchants(req, res); });
+
+  // v1
+  // router.post('/', (req, res) => { model.create(req, res); });
+  // router.put('/', (req, res) => { model.replace(req, res); });
+  // router.patch('/', (req, res) => { model.update(req, res); });
+  // router.delete('/', (req, res) => { model.remove(req, res); });
+
+  return router;
+}
+
+export class MerchantController extends Model {
   model: Merchant;
-
   constructor(db: DB) {
+    super(db, 'merchants');
     this.model = new Merchant(db);
-  }
-
-  init() {
-    // v2
-    this.router.get('/v2/myMerchants', (req, res) => { this.getMyMerchants(req, res); });
-    this.router.get('/v2/mySchedules', (req, res) => { this.getMySchedules(req, res); })
-    this.router.get('/getByAccountId', (req, res) => { this.getByAccountId(req, res); });
-    this.router.get('/qFind', (req, res) => { this.quickFind(req, res); });
-    this.router.get('/:id', (req, res) => { this.get(req, res); });
-    this.router.get('/', (req, res) => { this.model.list(req, res); });
-
-    // v1
-
-    this.router.post('/load', (req, res) => { this.load(req, res); });
-    // this.router.post('/', (req, res) => { this.create(req, res); });
-    // this.router.put('/', (req, res) => { this.replace(req, res); });
-    // this.router.patch('/', (req, res) => { this.update(req, res); });
-    // this.router.delete('/', (req, res) => { this.remove(req, res); });
-
-    return this.router;
   }
 
   list(req: Request, res: Response) {
@@ -74,24 +89,6 @@ export class MerchantRouter {
     });
   }
 
-  getMyMerchants(req: Request, res: Response) {
-    let fields: any;
-    let data: any;
-    if (req.headers) {
-      if (req.headers.filter && typeof req.headers.filter === 'string') {
-        data = JSON.parse(req.headers.filter);
-      }
-      if (req.headers.fields && typeof req.headers.fields === 'string') {
-        fields = JSON.parse(req.headers.fields);
-      }
-    }
-    const query = data.query;
-    const location = data.location;
-    this.model.getMyMerchants(location, query, fields).then((rs: any[]) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(JSON.stringify(rs, null, 3));
-    });
-  }
 
   getByAccountId(req: Request, res: Response) {
     let query = null;
@@ -168,4 +165,91 @@ export class MerchantRouter {
       }
     });
   }
+
+  gv1_list(req: Request, res: Response) {
+    const status = req.query.status;
+    const query = status ? {status} : {};
+
+    this.model.joinFind(query).then((merchants: any[]) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        code: Code.SUCCESS,
+        data: merchants 
+      }));
+    });
+  }
+
+  gv1_get(req: Request, res: Response) {
+    const id = req.params.id;
+    this.model.getById(id).then(merchant => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        code: merchant ? Code.SUCCESS : Code.FAIL,
+        data: merchant 
+      }));
+    });
+  }
+
+  // req.query.dt --- utc time of Toronto
+  // myLocalTime --- eg. '2020-04-23T10:09:00'
+  gv1_getDeliverySchedule(req: Request, res: Response) {
+    const myLocalTime = `${req.query.dt}`;
+    if (!myLocalTime || myLocalTime.length < 13) {
+      logger.warn("invalid local time: " + myLocalTime);
+      return res.json({
+        code: Code.FAIL,
+        data: []
+      });
+    }
+    
+    const myUtcTime = `${req.query.dt}`;
+    const dt = new DateTime();
+    const localTime = dt.getMomentFromUtc(myUtcTime).format('YYYY-MM-DDTHH:mm:ss');
+
+    logger.info(`My local time: ${localTime}`);
+
+    const merchantId = `${req.query.merchantId}`;
+
+    const lat = req.query.lat? +req.query.lat : 0;
+    const lng = req.query.lng? +req.query.lng : 0;
+
+    this.model.getDeliverSchedule(localTime, merchantId, lat, lng).then(schedules => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        code: schedules ? Code.SUCCESS : Code.FAIL,
+        data: schedules 
+      }));
+    });
+  }
+
+  gv1_getAvailableMerchants(req: Request, res: Response) {
+    const lat = req.query.lat? +req.query.lat : 0;
+    const lng = req.query.lng? +req.query.lng : 0;
+    const status = `${req.query.status}`;
+    const query = status ? {status}: {};
+    this.model.getAvailableMerchants(lat, lng, query).then((ms: any[]) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        code: ms ? Code.SUCCESS : Code.FAIL,
+        data: ms 
+      }));
+    });
+  }
+
+  // ?query={where:{}, options}
+  fv1_getAvailableMerchants(req: Request, res: Response) {
+    const lat = req.query.lat? +req.query.lat : 0;
+    const lng = req.query.lng? +req.query.lng : 0;
+    const deliverDate = `${req.query.deliverDate}`;
+    const status = `${req.query.status}`;
+    const query = status ? {status}: {};
+    this.model.getAvailableMerchants(lat, lng, query).then((ms: any[]) => {
+      res.setHeader('Content-Type', 'application/json');
+      res.send(JSON.stringify({
+        code: ms ? Code.SUCCESS : Code.FAIL,
+        data: ms 
+      }));
+    });
+  }
+
 };

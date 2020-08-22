@@ -474,6 +474,8 @@ export class Entity {
           items.push({ toId: new ObjectID(it.toId) });
         } else if (it && it.hasOwnProperty('fromId') && typeof it.fromId === 'string' && it.fromId.length === 24) {
           items.push({ fromId: new ObjectID(it.fromId) });
+        } else {
+          items.push(it);
         }
       });
       doc['$or'] = items;
@@ -505,30 +507,24 @@ export class Entity {
     return doc;
   }
 
-  bulkUpdate(items: any[], options?: any): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.getCollection().then((c: Collection) => {
-        const clonedArray: any[] = JSON.parse(JSON.stringify(items));
-        const a: any[] = [];
+  async bulkUpdate(items: any[], options?: any): Promise<any> {
+    const c: Collection = await this.getCollection();
+    const clonedArray: any[] = [...items];
+    const a: any[] = [];
 
-        clonedArray.map(item => {
-          let query = item.query;
-          let doc = item.data;
+    clonedArray.forEach(item => {
+      let query = item.query;
+      let doc = item.data;
 
-          query = this.convertIdFields(query);
-          doc = this.convertIdFields(doc);
-          a.push({ updateOne: { filter: query, update: { $set: doc }, upsert: true } });
-        });
-
-        c.bulkWrite(a, (err, result: BulkWriteOpResultObject) => {
-          if (err) {
-            resolve({ status: DbStatus.FAIL, msg: err });
-          } else {
-            resolve({ status: DbStatus.SUCCESS, msg: '' });
-          }
-        });
-      });
+      query = this.convertIdFields(query);
+      doc = this.convertIdFields(doc);
+      a.push({ updateOne: { filter: query, update: { $set: doc }, upsert: true } });
     });
+
+    if(a && a.length > 0){
+      await c.bulkWrite(a, options);
+    }
+    return { status: DbStatus.SUCCESS, msg: '' };
   }
 
   // use for test

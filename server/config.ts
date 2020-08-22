@@ -1,15 +1,25 @@
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
 
-import fs from 'fs';
+dotenv.config();
+
+const SVC_PORT: number = parseInt(process.env.SVC_PORT || '8000');
+const SVC_PATH: any = process.env.SVC_PATH;
+const DB_HOST: any = process.env.DB_HOST;
+const DB_NAME: any = process.env.DB_NAME;
+const DB_USERNAME: any = process.env.DB_USERNAME;
+const DB_PASSWORD: any = process.env.DB_PASSWORD;
 
 export interface IJWT {
-  EXPIRY: string;   // eg. '365 days'
+  EXPIRY: string; // eg. '365 days'
   ALGORITHM: string;
   SECRET: string;
 }
 
 export interface IApiServer {
-  PORT: number; //8000,
-  ROUTE_PREFIX: string; // "api"
+  SVC_PORT: number; //8000,
+  SVC_PATH: string; // "api"
 }
 
 export interface IDatabase {
@@ -49,38 +59,76 @@ export interface ISnappay {
   MD5_KEY: string;
 }
 
-export interface IStripe{
+export interface IAlphapay {
+  PARTNER_CODE: string;
+  CREDENTIAL_CODE: string;
+}
+
+export interface IStripe {
   API_KEY: string;
+}
+
+export interface IMoneris {
+  STORE_ID: string;
+  API_TOKEN: string;
+  CHECKOUT_ID: string;
+  ENVIRONMENT: "qa" | "prod";
+}
+
+export interface IAwsS3 {
+  ACCESS_ID: string,
+  ACCESS_KEY: string;
+  BUCKET_NAME: string;
 }
 
 export class Config {
   private cfg: any;
   public JWT: IJWT;
-  public GEOCODE_KEY: string = '';
-  public GOOGLE_PLACE_KEY: string = '';
-  public GOOGLE_MAP_KEY: string = '';
-  public GOOGLE_DISTANCE_KEY: string = '';
-  public API_SERVER: IApiServer;
+  public GEOCODE_KEY: string = "";
+  public GOOGLE_PLACE_KEY: string = "";
+  public GOOGLE_MAP_KEY: string = "";
+  public GOOGLE_DISTANCE_KEY: string = "";
+  public SERVER: IApiServer;
   public DATABASE: IDatabase;
   public TWILIO: ISmsProvider;
   public WECHAT: ISNS;
   public STRIPE: IStripe;
   public SNAPPAY: ISnappay;
+  public MONERIS: IMoneris;
+  public GOOGLE_AUTH_CLIENT_ID: string = "";
+  public ALPHAPAY: IAlphapay;
+  public AWS_S3: IAwsS3;
   
   constructor() {
-    this.cfg = JSON.parse(fs.readFileSync('../duocun.cfg.json', 'utf-8'));
+    this.cfg = JSON.parse(
+      fs.readFileSync(
+        path.join(__dirname, "..", "..", "duocun.cfg.json"),
+        "utf-8"
+      )
+    );
     this.JWT = this.cfg.JWT;
     this.GEOCODE_KEY = this.cfg.GEOCODE.KEY;
     this.GOOGLE_PLACE_KEY = this.cfg.GOOGLE_PLACE.KEY;
     this.GOOGLE_MAP_KEY = this.cfg.GOOGLE_MAP_KEY;
     this.GOOGLE_DISTANCE_KEY = this.cfg.GOOGLE_DISTANCE.KEY;
-    this.API_SERVER = this.cfg.API_SERVER;
-    this.DATABASE = this.cfg.DATABASE;
+
     this.TWILIO = this.cfg.TWILIO;
     this.WECHAT = this.cfg.WECHAT;
     this.STRIPE = this.cfg.STRIPE;
     this.SNAPPAY = this.cfg.SNAPPAY;
-  }
+    this.MONERIS = this.cfg.MONERIS;
+    this.GOOGLE_AUTH_CLIENT_ID = this.cfg.GOOGLE_AUTH_CLIENT_ID;
+    this.ALPHAPAY = this.cfg.ALPHAPAY;
+    this.AWS_S3 = this.cfg.AWS_S3;
 
+    this.DATABASE = {
+      HOST: DB_HOST,
+      NAME: DB_NAME,
+      PORT: 27017,
+      POOL_SIZE: 10,
+      USERNAME: DB_USERNAME,
+      PASSWORD: DB_PASSWORD
+    };
+    this.SERVER = {SVC_PORT, SVC_PATH};
+  }
 }
-  

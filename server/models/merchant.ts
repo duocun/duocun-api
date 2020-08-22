@@ -3,15 +3,13 @@ import { Model } from "./model";
 import { Entity } from "../entity";
 import { Mall, IMall, IDbMall } from "./mall";
 import { Distance, ILocation, IDistance, IPlace } from "./distance";
-import { Area, ILatLng, IArea } from "./area";
+import { Area, ILatLng, IArea, AppType } from "./area";
 import { Range, IRange } from './range';
-
-import { Request, Response } from "express";
 import { ObjectID, Collection, ObjectId } from "mongodb";
 import moment from "moment";
-import { resolve } from "path";
 import { IAccount, Account } from "./account";
 import { MerchantSchedule } from "./merchant-schedule";
+import { DateTime } from "./date-time";
 
 export const MerchantType = {
   RESTAURANT: 'R',
@@ -98,17 +96,39 @@ export class Merchant extends Model {
     this.rangeModel = new Range(dbo);
     this.scheduleModel = new MerchantSchedule(dbo);
   }
+  // this.merchantSvc.quickFind(query).then((rs: IMerchant[]) => {
+  //   if (areaId) {
+  //     this.merchantSchduleSvc.getAvailableMerchants(areaId).then((merchantIds: any[]) => {
+  //       if (merchantIds && merchantIds.length > 0) {
+  //         const availables = rs.filter(m => merchantIds.indexOf(m._id) !== -1);
+  //         self.merchants = availables;
+  //         res(availables);
+  //       } else {
+  //         self.merchants = [];
+  //         res([]);
+  //       }
+  //     });
+  //   } else {
+  //     self.merchants = rs;
+  //     res(rs);
+  //   }
+  // });
 
   // v2
-  async getMyMerchants(location: ILocation, query: any, fields: any[]) {
-    if(location && location.placeId){
-      const area = await this.areaModel.getMyArea(location);
+  async getAvailableMerchants(lat: number, lng: number, query: any, appType=AppType.GROCERY) {
+    if(lat && lng){
+      const area = await this.areaModel.getMyArea({lat, lng}, AppType.GROCERY);
       if (area) {
         const areaId = area._id.toString();
-        const schedules = await this.scheduleModel.find({ areaId });
-        const merchantIds = schedules.map((ms: any) => ms.merchantId.toString());
-        const q = { ...query, _id: { $in: merchantIds } };
-        return await this.find( q, fields);
+
+        if(appType === AppType.GROCERY){
+          const schedules = await this.scheduleModel.find({ areaId });
+          const merchantIds = schedules.map((ms: any) => ms.merchantId.toString());
+          const q = { ...query, _id: { $in: merchantIds } };
+          return await this.find(q);
+        }else{
+          return await this.find(query);
+        }
       } else {
         return [];
       }
@@ -119,7 +139,7 @@ export class Merchant extends Model {
 
   async getMySchedules(location: ILocation, merchantId: string, fields: any[]) {
     if(location && location.placeId){
-      const area = await this.areaModel.getMyArea(location);
+      const area = await this.areaModel.getMyArea(location, AppType.GROCERY);
       if(area){
         const areaId = area._id.toString();
         return await this.scheduleModel.find({merchantId, areaId});
@@ -360,6 +380,32 @@ export class Merchant extends Model {
 
 
 
-
+  // myLocalTime --- eg. '2020-04-23T23:12:00'
+  // return local time list [{ date: 'YYYY-MM-DD', time:'HH:mm' }]
+  async getDeliverSchedule(myLocalTime: string, merchantId: string, lat: number, lng: number, appType=AppType.GROCERY){
+    const merchant = await this.findOne({ _id: merchantId });
+    const orderEndList = merchant.rules.map((r: any) => r.orderEnd);
+    const dt = new DateTime();
+    if (merchant.delivers) {
+      const myUtc = moment.utc().toISOString();
+      const myLocalDateTime = dt.getMomentFromUtc(myUtc).format('YYYY-MM-DDTHH:mm:ss');
+      return this.scheduleModel.getSpecialSchedule(myLocalDateTime, orderEndList, merchant.delivers);
+    } else {
+      const schedule = await this.scheduleModel.getAvailableSchedule(merchantId, lat, lng, appType);
+      if (schedule && merchant) {
+        const dows = schedule.rules.map((r: any) => +r.deliver.dow);
+        const bs = this.scheduleModel.getLatestMatchDateList(myLocalTime, orderEndList, dows);
+  
+        const deliverTimeMap: any = {};
+        schedule.rules.forEach((r: any) => {
+          deliverTimeMap[r.deliver.time] = true;
+        });
+        const timeList = Object.keys(deliverTimeMap);
+        return this.scheduleModel.expandDeliverySchedule(bs, timeList);
+      } else {
+        return [];
+      }
+    }
+  }
 
 }

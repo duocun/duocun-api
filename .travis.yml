@@ -1,0 +1,37 @@
+language: node_js
+node_js:
+  - 14
+ 
+cache:
+   directories:
+       - node_modules
+deploy:
+ - provider: s3
+   access_key_id: $AWS_ACCESS_KEY_ID
+   secret_access_key: $AWS_SECRET_ACCESS_KEY
+   local_dir: dpl_cd_upload
+   skip_cleanup: true
+  
+   bucket: "duocun-api-deploy"
+   region: us-east-1
+   on: &2
+       repo: duocun/duocun-api
+       branch: develop
+ 
+ - provider: codedeploy
+   access_key_id: $AWS_ACCESS_KEY_ID
+   secret_access_key: $AWS_SECRET_ACCESS_KEY
+   bucket: "duocun-api-deploy"
+   key: latest.zip
+   bundle_type: zip
+   application: "duocun-api"
+   deployment_group: "dc-api-grp"
+   region: us-east-1
+   on: *2
+ 
+script:
+   - npm run test
+   - npm run build
+   - zip -q -r latest *
+   - mkdir -p dpl_cd_upload
+   - mv latest.zip dpl_cd_upload/latest.zip

@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { DB } from "../db";
-import { Model } from "./model";
+import { Model, Code } from "./model";
 import { ILocation, Location } from "./location";
 import { OrderSequence } from "./order-sequence";
 import moment from 'moment';
@@ -8,15 +8,19 @@ import { Merchant, IPhase, IMerchant, IDbMerchant } from "./merchant";
 import { Account, IAccount } from "./account";
 
 import { Transaction, ITransaction, TransactionAction } from "./transaction";
-import { Product, IProduct } from "./product";
+import { Product, IProduct, ProductStatus } from "./product";
 import { CellApplication, CellApplicationStatus, ICellApplication } from "./cell-application";
 import { Log, Action, AccountType } from "./log";
 import { createObjectCsvWriter } from 'csv-writer';
-import { ObjectID } from "mongodb";
+import { ObjectID, Collection, ObjectId } from "mongodb";
 import { ClientCredit } from "./client-credit";
 import fs from "fs";
 import { EventLog } from "./event-log";
 import { PaymentAction } from "./client-payment";
+import { memoryStorage } from "../../node_modules/@types/multer";
+import { resolve } from "dns";
+import { rejects } from "assert";
+import logger from "../lib/logger";
 
 const CASH_ID = '5c9511bb0851a5096e044d10';
 const CASH_NAME = 'Cash';
@@ -128,6 +132,14 @@ export interface IOrder {
   merchant?: IMerchant;
 }
 
+export enum OrderExceptionMessage {
+  PRODUCT_NOT_FOUND = "product not found",
+  ORDER_ITEMS_EMPTY = "order items empty",
+  OUT_OF_STOCK = "out of stock",
+  INVALID_CART = "invalid cart",
+  DELIVERY_EXPIRED = "delivery expired"
+};
+
 export class Order extends Model {
   private productModel: Product;
   private sequenceModel: OrderSequence;
@@ -155,8 +167,12 @@ export class Order extends Model {
     this.locationModel = new Location(dbo);
   }
 
-  // v2
-  async joinFindV2(query: any, fields: any) {
+  // v2 return [{
+  //  _id,
+  //  client:{ _id, username, phone },
+  //  merchant: { _id, name }
+  //  items: [{productId, productName, price, cost, quantity}]}];
+  async joinFindV2(query: any) {
     let q = query ? query : {};
     const rs = await this.find(q);
     const clientAccountIds = rs.map((r: any) => r.clientId);
@@ -170,23 +186,27 @@ export class Order extends Model {
       const items: any[] = [];
 
       if (order.clientId) {
-        order.client = clientAccounts.find((a: any) => a._id.toString() === order.clientId.toString());
+        const c = clientAccounts.find((a: any) => a._id.toString() === order.clientId.toString());
+        order.client = { _id: c._id.toString(), username: c.username, phone: c.phone };
       }
 
       if (order.merchantId) {
-        order.merchant = merchants.find((m: any) => m._id.toString() === order.merchantId.toString());
+        const m = merchants.find((m: any) => m._id.toString() === order.merchantId.toString());
+        order.merchant = { _id: m._id.toString(), name: m.name };
       }
 
       if (order.merchant && order.merchant.accountId) {
         const merchantAccount = merchantAccounts.find((a: any) => a && a._id.toString() === order.merchant.accountId.toString());
         if (merchantAccount) {
-          order.merchantAccount = merchantAccount;
+          const m = merchantAccount;
+          order.merchantAccount = { _id: m._id.toString(), name: m.name };
         }
       }
 
       if (order.driverId) {
         const driver = driverAccounts.find((a: IAccount) => a._id.toString() === order.driverId.toString());
-        order.driver = driver;
+        const d = driver;
+        order.driver = { _id: d._id.toString(), username: d.username, phone: d.phone };
       }
 
       if (order.items) {
@@ -199,7 +219,26 @@ export class Order extends Model {
         order.items = items;
       }
     });
-    return this.filterArray(rs, fields);
+
+    return rs.map(r => ({ 
+      _id: r._id,
+      code: r.code,
+      location: r.location,
+      address: this.locationModel.getAddrString(r.location), // deprecated
+      items: r.items,
+      price: r.price,
+      cost: r.cost,
+      paymentMethod: r.paymentMethod,
+      paymentStatus: r.paymentStatus,
+      status: r.status,
+      client: r.client, 
+      merchant: r.merchant,
+      // merchantAccount: r.merchantAccount,
+      driver: r.driver,
+      note: r.note,
+      delivered: r.deliverd,
+      created: r.creaded
+     }));
   }
 
   // get transactions with items
@@ -207,7 +246,7 @@ export class Order extends Model {
     const ts = await this.transactionModel.find(query, fields);
     if (fields.indexOf('items') !== -1) {
       const ids = ts.map((t: any) => t.orderId);
-      const orders = await this.joinFindV2({ _id: { $in: ids } }, ['_id', 'items']);
+      const orders = await this.joinFindV2({ _id: { $in: ids } });
       const orderMap: any = {};
       orders.map(order => { orderMap[order._id.toString()] = order.items; });
       ts.map((t: any) => t.items = t.orderId ? orderMap[t.orderId.toString()] : []);
@@ -446,7 +485,7 @@ export class Order extends Model {
     const date = order.deliverDate + 'T' + order.deliverTime + ':00.000Z';
     const time: any = order.deliverTime;
     const delivered = order.deliverDate + 'T15:00:00.000Z'; // this.getUtcTime(date, time).toISOString(); //tmp fix!!!
-
+    // await this.changeProductQuantity(order);
     if (order.code) {
       order.created = moment.utc().toISOString();
       order.delivered = delivered;
@@ -469,22 +508,58 @@ export class Order extends Model {
     this.placeOrders(orders).then((savedOrders: any[]) => {
       res.setHeader('Content-Type', 'application/json');
       res.send(JSON.stringify(savedOrders, null, 3));
+    }).catch(e => {
+      res.json({
+        code: Code.FAIL,
+        data: e
+      })
     });
+  }
+
+
+  async insertOne(doc: any): Promise<any> {
+    const c: Collection = await this.getCollection();
+    doc = this.convertIdFields(doc);
+    if(!doc.created){
+      doc.created = moment().toISOString();
+    }
+    doc.modified = moment().toISOString();
+    const client = await this.accountModel.findOne({_id: doc.clientId});
+    if(client){
+      doc.clientPhone = client.phone? client.phone : '';
+    }
+    const result = await c.insertOne(doc); // InsertOneWriteOpResult
+    const ret = (result.ops && result.ops.length > 0) ? result.ops[0] : null;
+    return ret;
   }
 
   // v2
   // create order batch Id
   async placeOrders(orders: IOrder[]) {
+    logger.info("=== BEGIN ORDER VALIDATION ===");
+    await this.validateOrders(orders);
+    logger.info("=== END ORDER VAILDATION ===");
     const savedOrders: IOrder[] = [];
-    const paymentId = (new ObjectID()).toString();
+    const paymentId = await this.getNewPaymentId();
+    logger.info(`New payment ID: ${paymentId}`);
     if (orders && orders.length > 0) {
       for (let i = 0; i < orders.length; i++) {
         orders[i].paymentId = paymentId;
         const order: IOrder = orders[i];
-
-        const savedOrder: IOrder = await this.doInsertOneV2(order);
-        savedOrders.push(savedOrder);
+        let savedOrder: IOrder|null = null;
+        try {
+          savedOrder = await this.doInsertOneV2(order);
+        } catch (e) {
+          console.log(e);
+          throw {
+            orderIdx: i, ...e
+          };
+        }
+        if (savedOrder) {
+          savedOrders.push(savedOrder);
+        }
       }
+
       const paymentMethod = orders[0].paymentMethod;
       if (paymentMethod === PaymentMethod.CASH || paymentMethod === PaymentMethod.PREPAY) {
         await this.addDebitTransactions(savedOrders);
@@ -495,53 +570,63 @@ export class Order extends Model {
     return savedOrders;
   }
 
+  async getNewPaymentId(): Promise<string> {
+    let paymentId: ObjectId;
+    do {
+      paymentId = new ObjectID();
+    } while(
+      await this.findOne({ paymentId })
+    )
+    return `${paymentId}`;
+  }
 
-
+  // 
   async doRemoveOne(orderId: string) {
-    // return new Promise((resolve, reject) => {
-    const docs = await this.find({ _id: orderId });
-    if (docs && docs.length > 0) {
-      const order = docs[0];
-      const x = await this.updateOne({ _id: orderId }, { status: OrderStatus.DELETED });
+    const order = await this.findOne({ _id: orderId });
+    if (order) {
       // temporary order didn't update transaction until paid
-      if (order.status === OrderStatus.TEMP) {
-        return order;
-      } else {
-        const merchantId: string = order.merchantId.toString();
-        const merchantName = order.merchantName;
-        const clientId: string = order.clientId.toString();
+      if (order.status === OrderStatus.NEW
+        || order.status === OrderStatus.MERCHANT_CHECKED
+      ) {
+        const merchantId: string = order.merchantId? order.merchantId.toString() : null;
+        const merchantName: string = order.merchantName;
+        const clientId: string = order.clientId? order.clientId.toString() : null;
         const clientName = order.clientName;
         const cost = order.cost;
         const total = order.total;
         const delivered = order.delivered;
+        
+        if(merchantId && clientId){
+          const merchant = await this.merchantModel.findOne({ _id: merchantId });
+          if(merchant && merchant.accountId){
+            const merchantAccountId = merchant.accountId.toString();
 
-        const ps = await this.productModel.find({});
-        const items: IOrderItem[] = [];
-        order.items.map((it: IOrderItem) => {
-          const product = ps.find((p: any) => p && p._id.toString() === it.productId.toString());
-          if (product) {
-            items.push({ productId: it.productId, quantity: it.quantity, price: it.price, cost: it.cost, product: product });
+            await this.updateOne({ _id: orderId }, { status: OrderStatus.DELETED });
+            const ps = await this.productModel.find({});
+            const items: IOrderItem[] = [];
+            order.items.forEach((it: IOrderItem) => {
+              const product = ps.find((p: any) => p && p._id.toString() === it.productId.toString());
+              if (product) {
+                items.push({ productId: it.productId, quantity: it.quantity, price: it.price, cost: it.cost, product: product });
+              }
+            });
+            
+            await this.transactionModel.updateMany({ orderId: orderId }, { status: 'del' });// This will affect balance calc
+            await this.transactionModel.saveTransactionsForRemoveOrder(orderId, merchantAccountId, merchantName, clientId, clientName, cost, total, delivered, items);
+            return order;
+          }else{
+            return;
           }
-        });
 
-        const merchant = await this.merchantModel.findOne({ _id: merchantId });
-        await this.transactionModel.updateMany({ orderId: orderId }, { status: 'del' });// This will affect balance calc
-        const merchantAccountId = merchant.accountId.toString();
-        await this.transactionModel.saveTransactionsForRemoveOrder(orderId, merchantAccountId, merchantName, clientId, clientName, cost, total, delivered, items);
-        return order;
+        }else{
+          return;
+        }
       }
     } else { // should never be here
       return;
     }
   }
 
-  removeOrder(req: Request, res: Response) {
-    const orderId = req.params.id;
-    this.doRemoveOne(orderId).then(x => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(JSON.stringify(x, null, 3));
-    });
-  }
 
   // obsoleted
   createV1(req: Request, res: Response) {
@@ -602,12 +687,10 @@ export class Order extends Model {
     });
   }
 
-  saveTransactionsForPlaceOrder(orders: any[], merchant: any) {
-    let promises = [];
+  async saveTransactionsForPlaceOrder(orders: any[], merchant: any) {
     for (let i = 0; i < orders.length; i++) {
       const order = orders[i];
-      promises.push(
-        this.transactionModel.saveTransactionsForPlaceOrder(
+      await this.transactionModel.saveTransactionsForPlaceOrder(
           order._id.toString(),
           order.type,
           merchant.accountId.toString(),
@@ -618,9 +701,8 @@ export class Order extends Model {
           order.total,
           order.delivered
         )
-      );
     }
-    return Promise.all(promises);
+    return;
   }
 
   // add transactions for placing order for duocun and merchant
@@ -642,7 +724,7 @@ export class Order extends Model {
       fromName: clientName,
       toId: BANK_ID,
       toName: BANK_NAME,
-      amount,
+      amount: Math.round(amount * 100)/100,
       actionCode,
       paymentId,
       delivered
@@ -655,42 +737,80 @@ export class Order extends Model {
 
   // paymentId --- order paymentId
   async processAfterPay(paymentId: string, actionCode: string, amount: number, chargeId: string) {
-    const orders = await this.find({ paymentId });
+    logger.info("--- BEGIN PROCESS AFTER PAY ---");
+    logger.info(`paymentId: ${paymentId}, amount: ${amount}`);
+    const orders = await this.find({ paymentId, status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED] }, paymentStatus: { $ne: PaymentStatus.PAID }});
     if (orders && orders.length > 0) {
+      logger.info("orders found");
       const order = orders[0];
+      logger.info(`first order id: ${order._id}`);
       if (order.paymentStatus === PaymentStatus.UNPAID) {
+        logger.info("order is not paid");
         // add two transactions for placing order for duocun and merchant
+        logger.info("Add debit transactions");
         await this.addDebitTransactions(orders);
 
         // add transaction to Bank and update the balance
         const delivered: any = order.delivered;
         const clientId = order.clientId.toString();
+        logger.info(`Client ID: ${clientId}`);
+        logger.info("Add credit transaction");
         await this.addCreditTransaction(paymentId, clientId, order.clientName, amount, actionCode, delivered); // .then(t => {
 
         // update payment status to 'paid' for the orders in batch
+        logger.info("update order status to be paid");
         const data = { status: OrderStatus.NEW, paymentStatus: PaymentStatus.PAID };
         const updates = orders.map(order => ({ query: { _id: order._id }, data }));
         await this.bulkUpdate(updates);
-        return;
+        // orders.forEach(order => {
+        //   amount -= order.total;
+        // });
+        // if (amount) {
+        //   logger.info("Amount after orders payment", amount);
+        //   const client = await this.accountModel.findOne({ _id: clientId });
+        //   if (client) {
+        //     logger.info("Client balance: " + client.balance);
+        //     client.balance = parseFloat(client.balance || 0) + amount;
+        //     client.balance = Number(Number(client.balance).toFixed(2));
+        //     logger.info("Client new balance: " + client.balance);
+        //     await this.accountModel.updateOne({ _id: client._id }, client);
+        //   } else {
+        //     logger.warn("Client not found");
+        //   }
+          
+        // }
+        
       }
     } else { // add credit for Wechat
+      logger.info("orders not found. Add credit to duocun account");
       const credit = await this.clientCreditModel.findOne({ paymentId }); // .then((credit) => {
+      
       if (credit) {
+        logger.info("Credit found");
         if (credit.status === PaymentStatus.UNPAID) {
+          logger.info("Credit unpaid");
+          logger.info("Updating payment status to be paid")
           await this.clientCreditModel.updateOne({ _id: credit._id }, { status: PaymentStatus.PAID }); // .then(() => {
           const accountId = credit.accountId.toString();
           const accountName = credit.accountName;
           const note = credit.note;
           const paymentMethod = credit.paymentMethod;
+          logger.info(`Add credit ${amount} to ${accountName}`);
           await this.transactionModel.doAddCredit(accountId, accountName, amount, paymentMethod, note); // .then(() => {
-          return;
         } else {
-          return;
+          logger.info("Credit already paid");
         }
       } else {
-        return;
+        logger.info("Credit not found");
       }
     }
+    for (let order of orders) {
+      if (order.paymentMethod === PaymentMethod.CREDIT_CARD || order.paymentMethod === PaymentMethod.WECHAT) {
+        logger.info(`Change product quantity after payment (type: ${order.paymentMethod}). Client Name: ${order.clientName} Payment ID: ${order.paymentId} Order ID: ${order._id}`);
+        await this.changeProductQuantity(order, true);
+      }
+    }
+    logger.info("--- END PROCESS AFTER PAY ---");
   }
 
   //-----------------------------------------------------------------------------------------
@@ -897,7 +1017,7 @@ export class Order extends Model {
     const end = start + itemsPerPage;
     const arr = arrSorted.slice(start, end);
 
-    return arr.map((order: any) => {
+    const orders = arr.map((order: any) => {
       const items: any[] = [];
       order.items.map((it: any) => {
         const product = ps.find((p: any) => p._id.toString() === it.productId.toString());
@@ -911,6 +1031,42 @@ export class Order extends Model {
       const address = this.locationModel.getAddrString(order.location);
       return { ...order, address, description, items, clientPhoneNumber };
     });
+
+    return { total: arrSorted.length, orders};
+  }
+
+  async loadHistoryV2(clientId: string, itemsPerPage: number, currentPageNumber: number) {
+    const client = await this.accountModel.findOne({ _id: clientId });
+    if (!client) {
+      return { total: 0, orders: [] };
+    }
+    let orders = await this.find({ clientId, status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED, OrderStatus.TEMP] } }, {
+      sort: [['created', 'desc']]
+    });
+    let group: any = {};
+    for (let order of orders) {
+      if (order.items && order.items.length) {
+        for (let item of order.items) {
+          const product = await this.productModel.findOne({ _id: item.productId });
+          if (product) {
+            item.product = product;
+          }
+        }
+      }
+      order.description = this.getDescription(order, 'zh');
+      order.clientPhoneNumber = client.phone;
+      order.address = this.locationModel.getAddrString(order.location);
+      if (group[order.paymentId]) {
+        group[order.paymentId].push(order);
+      } else {
+        group[order.paymentId] = [order];
+      }
+    }
+    const arrSorted = Object.values(group);
+    const start = (currentPageNumber - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const arr = arrSorted.slice(start, end);
+    return { total: arrSorted.length, data: arr };
   }
 
   async loadPage(query: any, itemsPerPage: number, currentPageNumber: number) {
@@ -1449,23 +1605,23 @@ export class Order extends Model {
   }
 
   // rs --- [{paymentId, orders[]}]
-  addCreditTransactions(rs: any[]) {
-    let promises = [];
-    for (let i = 0; i < rs.length; i++) {
-      const r = rs[i];
-      promises.push(
-        this.addCreditTransaction(
-          r.paymentId,
-          r.clientId,
-          r.clientName,
-          r.amount,
-          r.actionCode,
-          r.delivered
-        )
-      );
-    }
-    return Promise.all(promises);
-  }
+  // addCreditTransactions(rs: any[]) {
+  //   let promises = [];
+  //   for (let i = 0; i < rs.length; i++) {
+  //     const r = rs[i];
+  //     promises.push(
+  //       this.addCreditTransaction(
+  //         r.paymentId,
+  //         r.clientId,
+  //         r.clientName,
+  //         r.amount,
+  //         r.actionCode,
+  //         r.delivered
+  //       )
+  //     );
+  //   }
+  //   return Promise.all(promises);
+  // }
 
   async findMissingUnpaid() {
     const actionCode = TransactionAction.PAY_BY_CARD.code;
@@ -1789,5 +1945,144 @@ export class Order extends Model {
 
       });
   }
+
+
+  async validateOrders(orders: IOrder[]) {
+    // const nowDate = moment().format("YYYY-MM-DD HH:mm");
+    let i = 0;
+    for (let order of orders) {
+      // if (!(`${order.deliverDate} ${order.deliverTime}` > nowDate)) {
+      //   throw {
+      //     message: OrderExceptionMessage.DELIVERY_EXPIRED,
+      //     order
+      //   }
+      // }
+      logger.info(`Validating ${i}th order`);
+      logger.info("\t*** Begin Deliver Date Validation *** ");
+      if (!order.deliverDate) {
+        logger.warn(`Order has no delivered date`);
+        throw {
+          message: OrderExceptionMessage.DELIVERY_EXPIRED,
+          order
+        }
+      }
+      const delivered = order.deliverDate + 'T15:00:00.000Z';
+      if (!(delivered >= moment().toISOString())) {
+        logger.warn(`Order deliver date [${delivered}] is behind now`);
+        throw {
+          message: OrderExceptionMessage.DELIVERY_EXPIRED,
+          order
+        }
+      }
+      logger.info("\t***End Deliver Date Validation***");
+      logger.info("\t***Begin Product Quantity Validation***");
+      await this.getProductQuantity(order);
+      logger.info("\t***End Product Quantity Validation***");
+      i++;
+    }
+  }
+
+  async getProductQuantity(order: IOrder) {
+    const items = order.items;
+    if (!items || !items.length) {
+      throw {
+        message: OrderExceptionMessage.ORDER_ITEMS_EMPTY,
+        order 
+      };
+    }
+    for (let item of items) {
+      const productId = item.productId;
+      const product = await this.productModel.findOne({ _id: productId, status: ProductStatus.ACTIVE });
+      if (!product) {
+        throw {
+          message: OrderExceptionMessage.PRODUCT_NOT_FOUND,
+          productId
+        }
+      }
+      if (!product.stock || !product.stock.enabled) {
+        return product;
+      }
+      let productQuantity = product.stock.quantity || 0;
+      let itemQuantity = item.quantity || 1;
+      productQuantity = parseInt(productQuantity);
+      productQuantity = productQuantity - Math.abs(itemQuantity);
+      if (productQuantity < 0 && !product.stock.allowNegative) {
+        throw {
+          message: OrderExceptionMessage.OUT_OF_STOCK,
+          product: {
+            _id: productId,
+            name: product.name,
+            nameEN: product.nameEN,
+            quantity: product.stock.quantity
+          }
+        }
+      }
+      product.stock.quantity = productQuantity;
+      continue;
+    }
+  }
+
+  async changeProductQuantity(order: IOrder, force: boolean = false) {
+    logger.info("--- BEGIN CHANGE PRODUCT QUANTITY ---");
+    logger.info(`order id: ${order._id}`);
+    const items = order.items;
+    if (!items || !items.length) {
+      logger.info("order items empty");
+      logger.info("--- END CHANGE PRODUCT QUANTITY ---");
+      throw {
+        message: OrderExceptionMessage.ORDER_ITEMS_EMPTY,
+        order 
+      };
+    }
+    for (let item of items) {
+      const productId = item.productId;
+      logger.info("product id: " + productId);
+      const product = await this.productModel.findOne({ _id: productId, status: ProductStatus.ACTIVE });
+      if (!product) {
+        logger.info("product not found");
+        logger.info("--- END CHANGE PRODUCT QUANTITY ---");
+        throw {
+          message: OrderExceptionMessage.PRODUCT_NOT_FOUND,
+          productId
+        }
+      }
+      logger.info(`=== BEGIN Product: ${product.name} ===`);
+      if (!product.stock || !product.stock.enabled) {
+        logger.info("product stock option is not enabled");
+        logger.info(`=== END Product: ${product.name} ===`);
+        continue;
+      }
+      let productQuantity = product.stock.quantity || 0;
+      logger.info(`product qunantity: ${productQuantity}`);
+      let itemQuantity = item.quantity || 1;
+      logger.info(`purchased item quantity: ${itemQuantity}`);
+      productQuantity = parseInt(productQuantity);
+      productQuantity = productQuantity - Math.abs(itemQuantity);
+      logger.info(`new quantity: ${productQuantity}`);
+      if (productQuantity < 0 && !product.stock.allowNegative) {
+        logger.warn("product quantity is below zero");
+        if (!force) {
+          logger.error("product quantity is below zero.");
+          logger.info(`=== END Product: ${product.name} ===`);
+          logger.info("--- END CHANGE PRODUCT QUANTITY ---");
+          throw {
+            message: OrderExceptionMessage.OUT_OF_STOCK,
+            product: {
+              _id: productId,
+              name: product.name,
+              nameEN: product.nameEN,
+              quantity: product.stock.quantity,
+            },
+          };
+        }
+      }
+      logger.info("saving product");
+      product.stock.quantity = productQuantity;
+      await this.productModel.updateOne({ _id: product._id }, product);
+      logger.info(`=== END Product: ${product.name} ===`);
+    }
+    logger.info("--- END CHANGE PRODUCT QUANTITY ---");
+  }
+
 }
 

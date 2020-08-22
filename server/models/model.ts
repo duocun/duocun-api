@@ -11,11 +11,46 @@ export const TimeMap = [
   { pickup: '14:00', deliver: '16:00' }
 ];
 
+export const Status = {
+  ACTIVE: 'A',
+  INACTIVE: 'I'
+}
+
+export const Code = {
+  SUCCESS: 'success',
+  FAIL: 'fail'
+}
+
 export class Model extends Entity {
   constructor(dbo: DB, tableName: string) {
     super(dbo, tableName);
   }
 
+  async getById(id: string) {
+    if (id && ObjectID.isValid(id)) {
+      const r = await this.findOne({ _id: id });
+      if (r) {
+        return r;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  async find_v2(where: any, options?: object, fields?: Array<object>) {
+    const query = this.convertIdFields(where);
+    const collection = await this.getCollection();
+    const data: any[] = await collection.find(query, options).toArray();
+    const count: number = await collection.countDocuments(query, {});
+    return { data, count };
+  }
+
+  async findOne(query: any, options?: any, fields?: any[]): Promise<any> {
+    const self = this;
+    const c: Collection = await self.getCollection();
+    const q = this.convertIdFields(query);
+    return await c.findOne(q, options);
+  }
 
   // Wrong !
   // m --- local moment object for date, m.isUTC() must be false
