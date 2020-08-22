@@ -24,7 +24,7 @@ export function AccountRouter(db: DB) {
   // v2 https://duocun.ca/api/Accounts/wechatLoginByOpenId
   router.post('/wechatLoginByOpenId', (req, res) => { controller.wechatLoginByOpenId(req, res); });
   router.get('/wechatLoginByCode', (req, res) => { controller.wechatLoginByCode(req, res); });
-  router.get('/wechatSignup', (req, res) => {controller.wechatSignup(req, res); });
+  router.post('/wechatSignup', (req, res) => {controller.wechatSignup(req, res); });
   router.get('/qFind', (req, res) => { controller.list(req, res); }); // deprecated
   router.get('/', (req, res) => { controller.list(req, res); });
   router.get('/current', (req, res) => { controller.getCurrentAccount(req, res); });
