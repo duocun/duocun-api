@@ -23,6 +23,7 @@ require('dotenv').config()
 const SNAPPAY_BANK_ID = "5e60139810cc1f34dea85349";
 const SNAPPAY_BANK_NAME = "SnapPay Bank";
 
+
 const cfg = new Config();
 
 export const moneris = new MonerisCheckout(
@@ -677,7 +678,7 @@ export class ClientPaymentController extends Controller {
         description,
         price: Number((total * 100).toFixed(0)),
         currency: CurrencyType.CAD,
-        notify_url: `${process.env.BACKEND_URL}/api/ClientPayments/alphapay/success`,
+        notify_url: `${process.env.BACKEND_URL}/v1/ClientPayments/alphapay/success`,
         //@ts-ignore
         channel
       };
