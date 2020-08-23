@@ -98,7 +98,7 @@ const apimw = new ApiMiddleWare();
 const utils = new Utils();
 const cfg = new Config();
 
-const SVC_PATH = process.env.ENV === 'localhost' ? process.env.SVC_PATH : '';
+const SVC_PATH = process.env.ENV === 'local'? process.env.SVC_PATH : '';
 
 const app = express();
 
@@ -261,7 +261,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.set("port", cfg.SERVER.SVC_PORT);
 
   const server = app.listen(app.get("port"), () => {
-    console.log(`server path: ${cfg.SERVER.SVC_PATH}`);
+    console.log(`server path: ${SVC_PATH}`);
     console.log("API is running on :%d/n", app.get("port"));
   });
 

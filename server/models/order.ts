@@ -278,6 +278,12 @@ export class Order extends Model {
       query = (req.headers && req.headers.filter) ? JSON.parse(req.headers.filter) : null;
     }
 
+    // fix me
+    if(req.query && req.query.query){
+      const s: any = req.query.query;
+      query = JSON.parse(s).where;
+    }
+
     let fields: string[];
     if (req.headers && req.headers.fields && typeof req.headers.fields === 'string') {
       fields = (req.headers && req.headers.fields) ? JSON.parse(req.headers.fields) : null;
