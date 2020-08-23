@@ -207,8 +207,8 @@ export class ClientPayment extends Model {
     // const notify_url = app ? app.notifyUrl : ''; // 'https://duocun.com.cn/api/ClientPayments/notify';
     // const returnUrl = app ? app.returnUrls.find((r: any) => r.action === paymentActionCode) : { url: '' }; 'https://duocun.ca/grocery?p=h&cId='
     // const return_url = returnUrl.url + accountId; // 'https://duocun.ca/grocery?p=h&cId=' + accountId;
-    const return_url = returnUrl ? returnUrl : "https://duocun.ca/grocery?p=h&cId=" + accountId;
-    const notify_url = "https://duocun.com.cn/api/ClientPayments/notify";
+    const return_url = returnUrl ? returnUrl : `${process.env.FRONTEND_URL}/grocery?p=h&cId=${accountId}`;
+    const notify_url = `${process.env.BACKEND_URL}/ClientPayments/notify`;
     const trans_amount = Math.round(amount * 100) / 100;
 
     return {
