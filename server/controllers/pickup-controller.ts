@@ -80,7 +80,7 @@ export class PickupController extends Controller{
           {_id},
           updates
         );
-        if (r.nModified === 1 && r.ok === 1) {
+        if (r.ok === 1) {
           code = Code.SUCCESS;
           data = _id; // r.upsertedId ?
         } else {

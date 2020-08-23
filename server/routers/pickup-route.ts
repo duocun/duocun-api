@@ -9,7 +9,7 @@ export function PickupRouter(db: DB){
   const controller = new PickupController(model, db);
 
   router.get('/', (req, res) => { controller.list(req, res); });
-  router.put('/', (req, res) => { controller.updateOne(req, res); });
+  router.put('/:id', (req, res) => { controller.updateOne(req, res); });
   router.post('/', (req, res) => { controller.create(req, res); });
 
   router.get('/:id', (req, res) => { model.get(req, res); });
