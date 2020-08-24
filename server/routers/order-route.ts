@@ -7,12 +7,13 @@ export function OrderRouter(db: DB) {
   const router = express.Router();
   const model = new Order(db);
 
-  const controller = new OrderController(db);
+  const controller = new OrderController(model, db);
 
   router.get('/routes', (req: Request, res: Response) => { controller.getRoutes(req, res); });
   router.get('/', (req, res) => { model.list(req, res); });
   router.get('/:id', (req, res) => { model.get(req, res); });
-  
+  router.put('/:id', (req, res) => { controller.updateOne(req, res); });
+
   // yaml
   router.post('/bulk', async (req, res) => { await controller.placeOrders(req, res); });
   router.delete('/:id', (req, res) => { controller.removeOrder(req, res); });
@@ -50,7 +51,7 @@ export function OrderRouter(db: DB) {
 
 
   router.put('/updatePurchaseTag', (req, res) => { model.updatePurchaseTag(req, res) });
-  router.put('/', (req, res) => { model.replace(req, res); });
+  
   router.post('/checkStripePay', (req, res) => { model.checkStripePay(req, res); });
   router.post('/checkWechatpay', (req, res) => { model.checkWechatpay(req, res); });
   

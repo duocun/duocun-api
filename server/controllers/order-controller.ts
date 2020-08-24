@@ -2,18 +2,19 @@ import { Request, Response }  from "express";
 // import { Log, AppId } from "../models/log";
 import { DB } from "../db";
 import { Order, IOrder, OrderStatus, IOrderItem } from "../models/order";
-import { Model, Code } from "../models/model";
+import { Code } from "../models/model";
 import { Account } from "../models/account";
 import { Product } from "../models/product";
 import logger from "../lib/logger";
+import { Controller } from "./controller";
 
-export class OrderController extends Model {
+export class OrderController extends Controller {
   model: Order;
   accountModel: Account;
   productModel: Product;
-  constructor(db: DB) {
-    super(db, 'orders');
-    this.model = new Order(db);
+  constructor(model: Order, db: DB) {
+    super(model, db);
+    this.model = model;
     this.accountModel = new Account(db);
     this.productModel = new Product(db);
   }

@@ -1,6 +1,6 @@
 
 import moment from "moment";
-import https from "https";
+import axios from "axios";
 
 export const AppId = {
   API_V1: 'apiv1',
@@ -19,44 +19,12 @@ export interface ILog {
 }
 
 export const Log = {
-  save(data: ILog) {
-    const payload: ILog = {...data, created: moment().toISOString() };
-    return new Promise((resolve, reject) => {
-      const options = {
-        hostname: process.env.LOG_SVC_HOST,
-        path: process.env.LOG_SVC_PATH,
-        port: 443,
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json", // 'Content-Length': Buffer.byteLength(data)
-        },
-      };
-
-      const post_req = https.request(options, res => {
-        let s = "";
-        res.on("data", (d) => {
-          s += d;
-        });
-
-        res.on("end", () => {
-          if (s) {
-            const ret = JSON.parse(s);
-            resolve({ status: 'success', data: ret, msg: '' });
-          } else {
-            resolve({ status: 'failed', data: '', msg: '' });
-          }
-        });
-      });
-
-      post_req.on("error", (error) => {
-        const msg = JSON.stringify(error);
-        resolve({ status: 'failed', data: '', msg });
-      });
-
-      post_req.write(JSON.stringify(payload));
-      post_req.end();
-    });
+  async save(data: ILog) {
+    const url = `${process.env.LOG_SVC_URL}`;
+    const payload = { ...data, created: moment().toISOString()};
+    return await axios.post(url, payload);
   }
+
   // list(req: Request, res: Response) {
   //   let query = null;
   //   if (req.headers && req.headers.filter && typeof req.headers.filter === 'string') {
