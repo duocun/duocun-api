@@ -395,7 +395,7 @@ export class Order extends Model {
                   order.items.map((it: IOrderItem) => {
                     const product = ps.find((p: any) => p && p._id.toString() === it.productId.toString());
                     if (product) {
-                      items.push({ productId: it.productId, quantity: it.quantity, price: it.price, cost: it.cost, product: product });
+                      items.push({ productId: it.productId, productName: product.name, quantity: it.quantity, price: it.price, cost: it.cost, product: product });
                     }
                   });
                   order.items = items;
