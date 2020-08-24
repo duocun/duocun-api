@@ -1,4 +1,4 @@
-import express from "express";
+import express, {Request, Response} from "express";
 import { DB } from "../db";
 import { Order } from "../models/order";
 import { OrderController } from "../controllers/order-controller";
@@ -8,6 +8,8 @@ export function OrderRouter(db: DB) {
   const model = new Order(db);
 
   const controller = new OrderController(db);
+
+  router.get('/routes', (req: Request, res: Response) => { controller.getRoutes(req, res); });
 
   // yaml
   router.post('/bulk', async (req, res) => { await controller.placeOrders(req, res); });

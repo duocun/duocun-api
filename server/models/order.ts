@@ -1,20 +1,24 @@
-import { Request, Response } from "express";
-import { DB } from "../db";
-import { Model, Code } from "./model";
-import { ILocation, Location } from "./location";
-import { OrderSequence } from "./order-sequence";
+import fs from "fs";
+import axios from "axios";
 import moment from 'moment';
-import { Merchant, IPhase, IMerchant, IDbMerchant } from "./merchant";
-import { Account, IAccount } from "./account";
-
-import { Transaction, ITransaction, TransactionAction } from "./transaction";
-import { Product, IProduct, ProductStatus } from "./product";
+import { Request, Response } from "express";
 import { createObjectCsvWriter } from 'csv-writer';
 import { ObjectID, Collection, ObjectId } from "mongodb";
-import { ClientCredit } from "./client-credit";
-import fs from "fs";
-import { EventLog } from "./event-log";
+
 import logger from "../lib/logger";
+
+import { DB } from "../db";
+import { Model } from "./model";
+import { ILocation, Location } from "./location";
+import { OrderSequence } from "./order-sequence";
+import { Merchant, IMerchant } from "./merchant";
+import { Account, IAccount } from "./account";
+import { Transaction, ITransaction, TransactionAction } from "./transaction";
+import { Product, IProduct, ProductStatus } from "./product";
+import { ClientCredit } from "./client-credit";
+import { EventLog } from "./event-log";
+
+import { UNASSIGNED_DRIVER_ID } from "./driver";
 
 const CASH_ID = '5c9511bb0851a5096e044d10';
 const CASH_NAME = 'Cash';
@@ -155,6 +159,41 @@ export class Order extends Model {
     this.clientCreditModel = new ClientCredit(dbo);
     this.eventLogModel = new EventLog(dbo);
     this.locationModel = new Location(dbo);
+  }
+
+  async getOrderMapForDriver(deliverDate: string, driverId: string) {
+    const qDriverId = driverId && driverId !== UNASSIGNED_DRIVER_ID ? {driverId} : {}; 
+    const q = {
+      ...qDriverId,
+      deliverDate,
+      status: {
+        $nin: [OrderStatus.BAD, OrderStatus.DELETED, OrderStatus.TEMP],
+      },
+    };
+    const orders = await this.find(q);
+    const driverMap: any = {};
+
+    orders.forEach((order: IOrder) => {
+      const driverId = order.driverId ? order.driverId.toString() : 'unassigned';
+      driverMap[driverId] = {driverId, orders:[]};
+    });
+
+    orders.forEach((order: IOrder) => {
+      const driverId = order.driverId ? order.driverId.toString() : 'unassigned';
+      // const placeId = order.location.placeId;
+      const lat = order.location.lat;
+      const lng = order.location.lng;
+      const orderId = order._id?.toString();
+      driverMap[driverId].orders.push({ orderId, lat, lng });
+    });
+
+    return driverMap;
+  }
+
+  async getRoutes(deliverDate: string, driverId: string){
+      const data = await this.getOrderMapForDriver(deliverDate, driverId);
+      const url = 'https://duocun-route-api.herokuapp.com/routes';
+      return await axios.post(url, data);
   }
 
   // v2 return [{

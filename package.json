@@ -29,6 +29,7 @@
     "@types/twilio": "0.0.10",
     "alphapay": "^0.2.3",
     "aws-sdk": "^2.735.0",
+    "axios": "^0.20.0",
     "babel": "^6.23.0",
     "bcrypt": "^3.0.8",
     "compression": "^1.7.4",

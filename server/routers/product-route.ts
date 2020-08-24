@@ -81,6 +81,7 @@ class ProductController extends Model{
     if (req.headers && req.headers.filter && typeof req.headers.filter === 'string') {
       query = (req.headers && req.headers.filter) ? JSON.parse(req.headers.filter) : null;
     } else {
+      // fix me, replace with middleware
       query = req.query;
       if (query && query.query) {
         query = JSON.parse(query.query);

@@ -18,6 +18,39 @@ export class OrderController extends Model {
     this.productModel = new Product(db);
   }
 
+
+  async getRoutes(req: Request, res: Response){
+
+    // fix me, replace with middleware
+    let query: any = req.query;
+    if (query && query.query) {
+      query = JSON.parse(query.query);
+    }
+
+    res.setHeader("Content-Type", "application/json");
+    let data;
+    let code = Code.FAIL;
+
+    try {
+      const deliverDate: any = query.deliverDate;
+      const driverId: any = query.driverId; // optional
+
+      if(deliverDate && driverId){
+        const r = await this.model.getRoutes(deliverDate, driverId);
+        code = Code.SUCCESS;
+        data = r.data;
+      }
+    } catch (error) {
+      logger.error(`list error: ${error}`);
+    } finally {
+      res.send({
+          code,
+          data
+        }
+      );
+    }
+  }
+
   reqPlaceOrders(req: Request, res: Response) {
     const orders = req.body;
     this.model.placeOrders(orders).then((savedOrders: IOrder[]) => {
