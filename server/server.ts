@@ -46,7 +46,6 @@ import { PickupRouter } from "./routers/pickup-route";
 import { DriverRouter } from "./routers/driver-route";
 import { DriverShiftRouter } from "./routers/driver-shift-route";
 import { DriverScheduleRouter } from "./routers/driver-schedule-route";
-import { LogRouter } from "./routers/log-route";
 import { EventLogRouter } from "./routers/event-log-route";
 import { PageRouter } from "./routers/page-route";
 import { ToolRouter } from "./routers/tool-route";
@@ -251,7 +250,6 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.use(SVC_PATH + "/DriverHours", DriverHourRouter(dbo));
   app.use(SVC_PATH + "/DriverShifts", DriverShiftRouter(dbo));
   app.use(SVC_PATH + "/DriverSchedules", DriverScheduleRouter(dbo));
-  app.use(SVC_PATH + "/Logs", LogRouter(dbo));
   app.use(SVC_PATH + "/EventLogs", EventLogRouter(dbo));
   app.use(SVC_PATH + "/Messages", ChatMessageRouter(dbo));
 

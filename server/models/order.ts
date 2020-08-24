@@ -9,17 +9,11 @@ import { Account, IAccount } from "./account";
 
 import { Transaction, ITransaction, TransactionAction } from "./transaction";
 import { Product, IProduct, ProductStatus } from "./product";
-import { CellApplication, CellApplicationStatus, ICellApplication } from "./cell-application";
-import { Log, Action, AccountType } from "./log";
 import { createObjectCsvWriter } from 'csv-writer';
 import { ObjectID, Collection, ObjectId } from "mongodb";
 import { ClientCredit } from "./client-credit";
 import fs from "fs";
 import { EventLog } from "./event-log";
-import { PaymentAction } from "./client-payment";
-import { memoryStorage } from "../../node_modules/@types/multer";
-import { resolve } from "dns";
-import { rejects } from "assert";
 import logger from "../lib/logger";
 
 const CASH_ID = '5c9511bb0851a5096e044d10';
@@ -146,8 +140,6 @@ export class Order extends Model {
   private merchantModel: Merchant;
   private accountModel: Account;
   private transactionModel: Transaction;
-  private cellApplicationModel: CellApplication;
-  private logModel: Log;
   clientCreditModel: ClientCredit;
   eventLogModel: EventLog;
   locationModel: Location;
@@ -160,8 +152,6 @@ export class Order extends Model {
     this.merchantModel = new Merchant(dbo);
     this.accountModel = new Account(dbo);
     this.transactionModel = new Transaction(dbo);
-    this.cellApplicationModel = new CellApplication(dbo);
-    this.logModel = new Log(dbo);
     this.clientCreditModel = new ClientCredit(dbo);
     this.eventLogModel = new EventLog(dbo);
     this.locationModel = new Location(dbo);
@@ -492,6 +482,7 @@ export class Order extends Model {
     const time: any = order.deliverTime;
     const delivered = order.deliverDate + 'T15:00:00.000Z'; // this.getUtcTime(date, time).toISOString(); //tmp fix!!!
     // await this.changeProductQuantity(order);
+
     if (order.code) {
       order.created = moment.utc().toISOString();
       order.delivered = delivered;
@@ -507,19 +498,6 @@ export class Order extends Model {
       await this.accountModel.updateOne({ _id: order.clientId }, { type: 'client' });
       return savedOrder;
     }
-  }
-
-  reqPlaceOrders(req: Request, res: Response) {
-    const orders = req.body;
-    this.placeOrders(orders).then((savedOrders: any[]) => {
-      res.setHeader('Content-Type', 'application/json');
-      res.send(JSON.stringify(savedOrders, null, 3));
-    }).catch(e => {
-      res.json({
-        code: Code.FAIL,
-        data: e
-      })
-    });
   }
 
 
@@ -1131,49 +1109,49 @@ export class Order extends Model {
 
   // get all the orders that Merchant Viewed
   getLatestViewed(delivered: string): Promise<any[]> {
-    const range = { $gte: moment(delivered).startOf('day').toISOString(), $lte: moment(delivered).endOf('day').toISOString() };
-    const query: any = {
-      delivered: range,
-      type: OrderType.FOOD_DELIVERY,
-      status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED, OrderStatus.TEMP] }
-    };
+    // const range = { $gte: moment(delivered).startOf('day').toISOString(), $lte: moment(delivered).endOf('day').toISOString() };
+    // const query: any = {
+    //   delivered: range,
+    //   type: OrderType.FOOD_DELIVERY,
+    //   status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED, OrderStatus.TEMP] }
+    // };
 
     return new Promise((resolve, reject) => {
-      this.find(query).then((orders: any) => {
-        this.logModel.getLatestByAccount(Action.VIEW_ORDER, AccountType.MERCHANT, delivered).then((logs: any[]) => {
-          let rs: any[] = [];
-          if (logs && logs.length > 0) {
-            const accountIds: string[] = [];
-            logs.map((log: any) => { // each log has only one merchant
-              const merchantAccountId = log.merchantAccountId ? log.merchantAccountId.toString() : null;
-              if (merchantAccountId) {
-                accountIds.push(merchantAccountId);
-              }
-            });
+    //   this.find(query).then((orders: any) => {
+    //     this.logModel.getLatestByAccount(Action.VIEW_ORDER, AccountType.MERCHANT, delivered).then((logs: any[]) => {
+    //       let rs: any[] = [];
+    //       if (logs && logs.length > 0) {
+    //         const accountIds: string[] = [];
+    //         logs.map((log: any) => { // each log has only one merchant
+    //           const merchantAccountId = log.merchantAccountId ? log.merchantAccountId.toString() : null;
+    //           if (merchantAccountId) {
+    //             accountIds.push(merchantAccountId);
+    //           }
+    //         });
 
-            this.accountModel.find({ _id: { $in: accountIds } }).then(accounts => {
-              if (accounts && accounts.length > 0) {
-                accounts.map((a: IAccount) => {
-                  const log = logs.find(l => l.merchantAccountId.toString() === a._id.toString());
-                  const dt = moment(log.created);
-                  const merchants: any = a.merchants;
-                  if (merchants && merchants.length > 0) {
-                    const its = orders.filter((order: IOrder) => merchants.indexOf(order.merchantId.toString()) !== -1
-                      && moment(order.modified).isSameOrBefore(dt));
+    //         this.accountModel.find({ _id: { $in: accountIds } }).then(accounts => {
+    //           if (accounts && accounts.length > 0) {
+    //             accounts.map((a: IAccount) => {
+    //               const log = logs.find(l => l.merchantAccountId.toString() === a._id.toString());
+    //               const dt = moment(log.created);
+    //               const merchants: any = a.merchants;
+    //               if (merchants && merchants.length > 0) {
+    //                 const its = orders.filter((order: IOrder) => merchants.indexOf(order.merchantId.toString()) !== -1
+    //                   && moment(order.modified).isSameOrBefore(dt));
 
-                    if (its && its.length > 0) {
-                      rs = rs.concat(its);
-                    }
-                  }
-                });
-              }
-              resolve(rs);
-            });
-          } else {
-            resolve([]);
-          }
-        });
-      });
+    //                 if (its && its.length > 0) {
+    //                   rs = rs.concat(its);
+    //                 }
+    //               }
+    //             });
+    //           }
+    //           resolve(rs);
+    //         });
+    //       } else {
+    //         resolve([]);
+    //       }
+    //     });
+    //   });
     });
   }
   // tools

@@ -8,8 +8,6 @@ import { IOrderItem, PaymentMethod, Order } from "./order";
 import { EventLog } from "./event-log";
 import { ResponseStatus } from "./client-payment";
 
-import fs from 'fs';
-import { AccountType } from "./log";
 import { Product } from "./product";
 
 const CASH_BANK_ID = '5c9511bb0851a5096e044d10';

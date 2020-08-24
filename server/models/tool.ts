@@ -11,12 +11,9 @@ import { Merchant, IPhase, IMerchant, IDbMerchant } from "./merchant";
 import { Account, IAccount } from "./account";
 import { Transaction, ITransaction, TransactionAction } from "./transaction";
 import { Product, IProduct } from "./product";
-import { CellApplication, CellApplicationStatus, ICellApplication } from "./cell-application";
-import { Log, Action, AccountType } from "./log";
+import { CellApplication } from "./cell-application";
 import { ClientCredit } from "./client-credit";
 import { EventLog } from "./event-log";
-import { PaymentAction } from "./client-payment";
-import { resolve } from "path";
 
 const CASH_ID = '5c9511bb0851a5096e044d10';
 const CASH_NAME = 'Cash';
@@ -37,7 +34,6 @@ export class Tool {
     private accountModel: Account;
     private transactionModel: Transaction;
     private cellApplicationModel: CellApplication;
-    private logModel: Log;
     clientCreditModel: ClientCredit;
     eventLogModel: EventLog;
   
@@ -48,7 +44,6 @@ export class Tool {
       this.accountModel = new Account(dbo);
       this.transactionModel = new Transaction(dbo);
       this.cellApplicationModel = new CellApplication(dbo);
-      this.logModel = new Log(dbo);
       this.clientCreditModel = new ClientCredit(dbo);
       this.eventLogModel = new EventLog(dbo);
   }
