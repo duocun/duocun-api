@@ -10,7 +10,9 @@ export function OrderRouter(db: DB) {
   const controller = new OrderController(db);
 
   router.get('/routes', (req: Request, res: Response) => { controller.getRoutes(req, res); });
-
+  router.get('/', (req, res) => { model.list(req, res); });
+  router.get('/:id', (req, res) => { model.get(req, res); });
+  
   // yaml
   router.post('/bulk', async (req, res) => { await controller.placeOrders(req, res); });
   router.delete('/:id', (req, res) => { controller.removeOrder(req, res); });
@@ -45,9 +47,7 @@ export function OrderRouter(db: DB) {
   
   router.get('/trends', (req, res) => { model.getOrderTrends(req, res); });
   router.get('/qFind', (req, res) => { model.quickFind(req, res); });
-  router.get('/', (req, res) => { model.list(req, res); });
-  
-  router.get('/:id', (req, res) => { model.get(req, res); });
+
 
   router.put('/updatePurchaseTag', (req, res) => { model.updatePurchaseTag(req, res) });
   router.put('/', (req, res) => { model.replace(req, res); });

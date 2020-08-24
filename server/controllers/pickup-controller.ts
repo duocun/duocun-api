@@ -1,8 +1,7 @@
 import { Controller, Code } from "./controller";
-import express, { Request, Response }  from "express";
+import { Request, Response }  from "express";
 import { Pickup } from "../models/pickup";
 import { DB } from "../db";
-import { Model } from "../models/model";
 
 export class PickupController extends Controller{
   model: Pickup;
@@ -13,21 +12,30 @@ export class PickupController extends Controller{
   }
 
   async list(req: Request, res: Response):Promise<void> { 
-    let query = {};
+    let query: any = {};
+    let where: any = {};
     if (req.headers) {
       if (req.headers.filter && typeof req.headers.filter === 'string') {
-        query = req.headers.filter ? JSON.parse(req.headers.filter) : null;
+        where = req.headers.filter ? JSON.parse(req.headers.filter) : null;
       }
     }
-    const options: any = req.query.options;
+
+    // fix me, replace with middleware
+    query = req.query;
+    if (query && query.query) {
+      query = JSON.parse(query.query);
+      where = query.where;
+    }
+
+    const options: any = query.options;
     let data:any[] = [];
     let count:number = 0;
     let code = Code.FAIL;
     try {
-      if(query){
+      if(where){
         // console.log(`query: ${where}`);
         // TODO: no where will return error, is it a good choice?
-        const r = await this.model.find_v2(query, options)
+        const r = await this.model.find_v2(where, options)
         code = Code.SUCCESS;
         data = r.data;
         count = r.count;
