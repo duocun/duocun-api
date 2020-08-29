@@ -28,6 +28,9 @@ import { MerchantBalanceRouter } from "./routers/merchant-balance-route";
 import { MerchantScheduleRouter } from "./routers/merchant-schedule-route";
 import { MallScheduleRouter } from "./routers/mall-schedule-route";
 
+
+import { PaymentRouter } from "./routers/payment-route";
+
 import { ClientPaymentRouter } from "./routers/client-payment-route";
 import { DriverPaymentRouter } from "./routers/driver-payment-route";
 import { DriverBalanceRouter } from "./routers/driver-balance-route";
@@ -221,6 +224,8 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
     MerchantScheduleRouter(dbo)
   );
   app.use(SVC_PATH + "/MallSchedules", MallScheduleRouter(dbo));
+  
+  app.use(SVC_PATH + "/payments", PaymentRouter(dbo));
 
   app.use(SVC_PATH + "/ClientPayments", ClientPaymentRouter(dbo));
   app.use(SVC_PATH + "/DriverPayments", DriverPaymentRouter(dbo));
