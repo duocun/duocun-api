@@ -49,7 +49,7 @@ export class Snappay {
             return_url,
             trans_amount,
             trans_currency: 'CAD',
-            // version: "1.0",
+            version: "1.0"
         };
     }
 
