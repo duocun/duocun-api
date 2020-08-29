@@ -185,30 +185,9 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
     const t = 1;
   });
 
-  // app.post(
-  //   SVC_PATH + "/files/upload",
-  //   upload.single("file"),
-  //   (req, res) => {
-  //     const product = new Product(dbo);
-  //     product.uploadPicture(req, res);
-  //   }
-  // );
-
-  // app.get('/' + SVC_PATH + '/Pictures', (req, res) => {
-  //   picture.get(req, res);
+  // app.post("/alphatest", (res) => {
+  //   const room = "payment:5cba947eca9f641b677138ef";
   // });
-
-  // app.post(
-  //   SVC_PATH + "/files/upload",
-  //   upload.single("file"),
-  //   (req, res, next) => {
-  //     res.send("upload file success");
-  //   }
-  // );
-
-  app.post("/alphatest", (res) => {
-    const room = "payment:5cba947eca9f641b677138ef";
-  });
   // disable auth token for testing
   if (process.env.ENV != "dev") {
     app.use(apimw.auth);
