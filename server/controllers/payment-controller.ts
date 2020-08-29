@@ -16,10 +16,10 @@ export class PaymentController {
         this.orderModel = new Order(db);
     }
 
-    snappayWebAliPay(req: Request, res: Response) {
-        const {amount, description, paymentId, returnUrl }: any = req.body;
+    snappayPay(req: Request, res: Response) {
+        const {method, paymentMethod, amount, description, paymentId, returnUrl }: any = req.body;
         Log.save({ msg: `Snappay pay req --- paymentId: ${paymentId}, ${JSON.stringify(req.body)}`});
-        this.snappay.pay('ALIPAY', 'pay.webpay', amount, returnUrl, description, paymentId).then(({data}) => {
+        this.snappay.pay(method, paymentMethod, amount, returnUrl, description, paymentId).then(({data}) => {
             Log.save({ msg: `Snappay pay req --- paymentId: ${paymentId}, ${JSON.stringify(data)}`});
             res.setHeader('Content-Type', 'application/json');
             res.send({status: 'success', data}); // data.webpay_url
