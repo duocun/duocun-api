@@ -89,6 +89,18 @@ export class Snappay {
         return err;
     }
 
+    getPaymentUrl(method: string, data: any){
+        if(method === 'pay.webpay'){
+            return data && data[0] ? data[0].webpay_url : ""
+        }else if(method === 'pay.h5pay') {
+            return data && data[0] ? data[0].h5pay_url : ""
+        }else if(method === SnappayMethod.QRCODE){
+            return data && data[0] ? data[0].qrcode_url : ""
+        }else{
+            return '';
+        }
+    }
+
     /**
      * 
      * @param method 
@@ -130,20 +142,13 @@ export class Snappay {
         const status = ret.msg === 'success'? ResponseStatus.SUCCESS : ResponseStatus.FAIL;
         const msg = "msg:" + (ret ? ret.msg : "N/A");
 
-        let url = '';
-        if(method === 'pay.webpay'){
-            url = ret.data && ret.data[0] ? ret.data[0].webpay_url : ""
-        }else if(method === 'pay.h5pay') {
-            url = ret.data && ret.data[0] ? ret.data[0].h5pay_url : ""
-        }
-
         return {
           status,
           code,             // stripe/snappay code
           decline_code: "", // stripe decline_code
           msg,              // stripe/snappay retrun message
           chargeId: "",     // stripe only { chargeId:x }
-          url,
+          url: this.getPaymentUrl(method, ret.data),
           err: ret.msg === 'success' ? PaymentError.NONE : this.getPaymentError(paymentMethod)
         };
     }
