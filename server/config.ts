@@ -5,9 +5,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const SVC_PORT: number = parseInt(process.env.SVC_PORT || '8000');
-const SVC_PATH: any = process.env.SVC_PATH;
-const DB_HOST: any = process.env.DB_HOST;
-const DB_NAME: any = process.env.DB_NAME;
+// const SVC_PATH: any = process.env.SVC_PATH;
+// const DB_HOST: any = process.env.DB_HOST;
+// const DB_NAME: any = process.env.DB_NAME;
+const SVC_PATH: any = process.env.SVC_PATH || "/api";
+const DB_HOST: any = process.env.DB_HOST || "27017";
+const DB_NAME: any = process.env.DB_NAME || "duocun";
 const DB_USERNAME: any = process.env.DB_USERNAME;
 const DB_PASSWORD: any = process.env.DB_PASSWORD;
 

@@ -50,7 +50,7 @@ import { EventLogRouter } from "./routers/event-log-route";
 import { PageRouter } from "./routers/page-route";
 import { ToolRouter } from "./routers/tool-route";
 import { ChatMessageRouter } from "./routers/message-route";
-
+import { SettingRouter } from "./routers/setting-route";
 import { CellApplicationRouter } from "./routers/cell-application-route";
 
 import { AreaRouter } from "./routers/area-route";
@@ -97,7 +97,7 @@ const apimw = new ApiMiddleWare();
 const utils = new Utils();
 const cfg = new Config();
 
-const SVC_PATH = process.env.ENV === 'local'? process.env.SVC_PATH : '';
+const SVC_PATH = process.env.ENV === 'localhost'? process.env.SVC_PATH : '';
 
 const app = express();
 
@@ -222,7 +222,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.use(SVC_PATH + "/Categories", CategoryRouter(dbo));
   app.use(SVC_PATH + "/Products", ProductRouter(dbo));
   app.use(SVC_PATH + "/Pages", PageRouter(dbo));
-
+  app.use(SVC_PATH + "/Setting", SettingRouter(dbo));
   app.use(SVC_PATH + "/Tools", ToolRouter(dbo));
   app.use(SVC_PATH + "/Contacts", ContactRouter(dbo));
   app.use(SVC_PATH + "/Ranges", RangeRouter(dbo));
