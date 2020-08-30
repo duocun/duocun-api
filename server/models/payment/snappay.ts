@@ -1,5 +1,8 @@
 import { Md5 } from "ts-md5";
 import axios from "axios";
+import { IPaymentResponse, ResponseStatus } from "./index";
+import { PaymentError } from "../client-payment";
+
 export const SnappayMethod = {
     WEB: 'pay.webpay',
     H5: 'pay.h5pay'
@@ -69,28 +72,77 @@ export class Snappay {
         return data;
     }
 
+    getPaymentError(paymentMethod: string){
+        let err = PaymentError.NONE;
+        if(paymentMethod === SnappayPaymentMethod.ALI){
+            err = PaymentError.ALIPAY_FAIL;
+        }else if(paymentMethod === SnappayPaymentMethod.WECHAT){
+            err = PaymentError.WECHATPAY_FAIL;
+        }else if(paymentMethod === SnappayPaymentMethod.UNIONPAY){
+            err = PaymentError.UNIONPAY_FAIL;
+        }else{
+            // pass
+        }
+        return err;
+    }
+
+    /**
+     * 
+     * @param method 
+     * @param paymentMethod 
+     * @param amount 
+     * @param returnUrl 
+     * @param description 
+     * @param paymentId 
+     * 
+     * return {
+     *  "code":"0",
+     *  "data":[{"webpay_url":"https://globalmapi.alipay.com/gateway.do?","out_order_no":"5f4aa50764e530467dfacd94","trans_status":"USERPAYING"}],
+     *  "msg":"success",
+     *  "psn":"08291857122767208110",
+     *  "sign":"212a75e2791f04afc5132c582e4ce1b2",
+     *  "total":1}
+     */
     async pay(
-        // accountId: string,
-        // appCode: string,
-        // paymentActionCode: string,
         method: string,
         paymentMethod: string,
         amount: number,
         returnUrl: string,
         description: string,
         paymentId: string
-    ) {
+    ): Promise<IPaymentResponse> {
         const d = this.getPostData(
             paymentMethod,
             method,
-            // accountId,
             paymentId,
             amount,
             returnUrl,
             description
         );
         const data = this.signPostData(d);
-        return await axios.post(`https://open.snappay.ca/api/gateway`, data);
+        const r = await axios.post(`https://open.snappay.ca/api/gateway`, data);
+
+        const ret = r.data;
+        const code = ret ? ret.code : "";
+        const status = ret.msg === 'success'? ResponseStatus.SUCCESS : ResponseStatus.FAIL;
+        const msg = "msg:" + (ret ? ret.msg : "N/A");
+
+        let url = '';
+        if(method === 'pay.webpay'){
+            url = ret.data && ret.data[0] ? ret.data[0].webpay_url : ""
+        }else if(method === 'pay.h5pay') {
+            url = ret.data && ret.data[0] ? ret.data[0].h5pay_url : ""
+        }
+
+        return {
+          status,
+          code,             // stripe/snappay code
+          decline_code: "", // stripe decline_code
+          msg,              // stripe/snappay retrun message
+          chargeId: "",     // stripe only { chargeId:x }
+          url,
+          err: ret.msg === 'success' ? PaymentError.NONE : this.getPaymentError(paymentMethod)
+        };
     }
 
     // async handleNotify(paymentId: string, amount: number) {

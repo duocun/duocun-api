@@ -5,6 +5,7 @@ import { TransactionAction } from '../models/transaction';
 import { Order } from '../models/order';
 import { DB } from '../db';
 import { Log } from '../models/log';
+import { IPaymentResponse } from '../models/payment/index';
 
 export class PaymentController {
     
@@ -19,12 +20,18 @@ export class PaymentController {
     snappayPay(req: Request, res: Response) {
         const {method, paymentMethod, amount, description, paymentId, returnUrl }: any = req.body;
         Log.save({ msg: `Snappay pay req --- paymentId: ${paymentId}, ${JSON.stringify(req.body)}`});
-        this.snappay.pay(method, paymentMethod, amount, returnUrl, description, paymentId).then(({data}) => {
-            Log.save({ msg: `Snappay pay req --- paymentId: ${paymentId}, ${JSON.stringify(data)}`});
+        this.snappay.pay(
+            method, 
+            paymentMethod, 
+            amount, 
+            returnUrl, 
+            description, 
+            paymentId
+        ).then((r: IPaymentResponse) => {
+            Log.save({ msg: `Snappay pay rsp --- paymentId: ${paymentId}, ${JSON.stringify(r)}`});
             res.setHeader('Content-Type', 'application/json');
-            res.send({status: 'success', data}); // data.webpay_url
-        })
-
+            res.send(r);
+        });
     }
 
     // fix me
