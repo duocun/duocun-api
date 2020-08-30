@@ -5,7 +5,8 @@ import { PaymentError } from "../client-payment";
 
 export const SnappayMethod = {
     WEB: 'pay.webpay',
-    H5: 'pay.h5pay'
+    H5: 'pay.h5pay',
+    QRCODE: 'pay.qrcodepay'
 }
 
 export const SnappayPaymentMethod = {
@@ -21,8 +22,10 @@ export class Snappay {
             return `${process.env.BACKEND_URL}/payments/snappay/webnotify`;
         }else if(method === SnappayMethod.H5){
             return `${process.env.BACKEND_URL}/payments/snappay/h5notify`;
+        }else if(method === SnappayMethod.QRCODE){
+            return `${process.env.BACKEND_URL}/payments/snappay/qrcodenotify`;
         }else{
-            return `${process.env.BACKEND_URL}/payments/snappay/webnotify`;
+            return `${process.env.BACKEND_URL}/payments/snappay/qrcodenotify`;
         }
     }
 
