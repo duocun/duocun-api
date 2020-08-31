@@ -47,7 +47,7 @@ export class PaymentController {
         }
     }
 
-    snappayWebNotify(req: Request, res: Response) {
+    snappayNotify(req: Request, res: Response) {
         const rsp = req.body;
         // console.log('snappayNotify trans_status:' + b.trans_status);
         // console.log('snappayNotify trans_no:' + b.trans_no);
