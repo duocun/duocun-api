@@ -2,6 +2,7 @@ import { Md5 } from "ts-md5";
 import axios from "axios";
 import { IPaymentResponse, ResponseStatus } from "./index";
 import { PaymentError } from "../client-payment";
+import { Log } from '../../models/log';
 
 export const SnappayMethod = {
     WEB: 'pay.webpay',
@@ -136,7 +137,7 @@ export class Snappay {
         );
         const data = this.signPostData(d);
         const r = await axios.post(`https://open.snappay.ca/api/gateway`, data);
-
+        Log.save({msg: `snappay axios return: ${JSON.stringify(r)}`});
         const ret = r.data;
         const code = ret ? ret.code : "";
         const status = ret.msg === 'success'? ResponseStatus.SUCCESS : ResponseStatus.FAIL;
