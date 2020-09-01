@@ -200,7 +200,8 @@ export class Snappay {
         amount: number,
         returnUrl: string,
         description: string,
-        paymentId: string
+        paymentId: string,
+        browserType: string
       ) {
         const self = this;
     
@@ -211,7 +212,8 @@ export class Snappay {
             paymentId,
             amount,
             returnUrl,
-            description
+            description,
+            browserType
           );
           const params = this.signPostData(data);
           const options = {
