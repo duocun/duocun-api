@@ -39,13 +39,31 @@ export class Snappay {
         paymentId: string,
         amount: number,
         returnUrl: string,
-        description: string
+        description: string,
+        browserType: string
     ) {
         const return_url = returnUrl;                                           // `${process.env.FRONTEND_URL}?p=h&cId=${accountId}`;
         const notify_url = `${process.env.BACKEND_URL}/payments/snappay/notify`; // `${process.env.BACKEND_URL}/payments/notify`;
         const trans_amount = Math.round(amount * 100) / 100;
 
-        return {
+        return method === SnappayMethod.WEB ?
+        {
+            // the order matters
+            app_id: process.env.SNAPPAY_APP_ID,
+            browser_type: browserType,
+            charset: "UTF-8",
+            description,
+            format: "JSON",
+            merchant_no: process.env.SNAPPAY_MERCHANT_ID,
+            method,
+            notify_url,
+            out_order_no: paymentId,
+            payment_method: paymentMethod,
+            return_url,
+            trans_amount,
+            trans_currency: 'CAD',
+            version: "1.0"
+        } : {
             // the order matters
             app_id: process.env.SNAPPAY_APP_ID,
             charset: "UTF-8",
@@ -128,7 +146,8 @@ export class Snappay {
         amount: number,
         returnUrl: string,
         description: string,
-        paymentId: string
+        paymentId: string,
+        browserType: string
     ): Promise<IPaymentResponse> {
         
         const d = this.getPostData(
@@ -137,7 +156,8 @@ export class Snappay {
             paymentId,
             amount,
             returnUrl,
-            description
+            description,
+            browserType
         );
         const data = this.signPostData(d);
         let r;

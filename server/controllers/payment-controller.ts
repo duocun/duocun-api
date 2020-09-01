@@ -18,7 +18,7 @@ export class PaymentController {
     }
 
     snappayPay(req: Request, res: Response) {
-        const {method, paymentMethod, amount, description, paymentId, returnUrl }: any = req.body;
+        const {method, paymentMethod, amount, description, paymentId, returnUrl, browserType }: any = req.body;
         Log.save({ msg: `Snappay pay req --- paymentId: ${paymentId}, ${JSON.stringify(req.body)}`});
         this.snappay.pay(
             method, 
@@ -26,7 +26,8 @@ export class PaymentController {
             amount, 
             returnUrl, 
             description, 
-            paymentId
+            paymentId,
+            browserType
         ).then((r: IPaymentResponse) => {
             Log.save({ msg: `Snappay pay rsp --- paymentId: ${paymentId}, ${JSON.stringify(r)}`});
             res.setHeader('Content-Type', 'application/json');
