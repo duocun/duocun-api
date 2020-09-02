@@ -13,7 +13,7 @@ export const AppId = {
 
 export interface ILog {
   _id?: string;
-  appId: string;
+  appId?: string;
   msg: string;
   created?: string;
 }
@@ -22,6 +22,9 @@ export const Log = {
   async save(data: ILog) {
     const url = `${process.env.LOG_SVC_URL}`;
     const payload = { ...data, created: moment().toISOString()};
+    if(!payload.appId){
+      payload.appId = AppId.API_V1;
+    }
     return await axios.post(url, payload);
   }
 
