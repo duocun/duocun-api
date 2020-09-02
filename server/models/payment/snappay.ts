@@ -4,9 +4,6 @@ import { IPaymentResponse, ResponseStatus } from "./index";
 import { PaymentError } from "../client-payment";
 import { Log } from '../log';
 
-import https from 'https';
-import { IncomingMessage } from "http";
-
 export const SnappayMethod = {
     WEB: 'pay.webpay',
     H5: 'pay.h5pay',
@@ -20,18 +17,6 @@ export const SnappayPaymentMethod = {
 }
 
 export class Snappay {
-    
-    // getNotifyUrl(method: string){
-    //     if(method === SnappayMethod.WEB){
-    //         return `${process.env.BACKEND_URL}/payments/snappay/webnotify`;
-    //     }else if(method === SnappayMethod.H5){
-    //         return `${process.env.BACKEND_URL}/payments/snappay/h5notify`;
-    //     }else if(method === SnappayMethod.QRCODE){
-    //         return `${process.env.BACKEND_URL}/payments/snappay/qrcodenotify`;
-    //     }else{
-    //         return `${process.env.BACKEND_URL}/payments/snappay/qrcodenotify`;
-    //     }
-    // }
 
     getPostData(
         method: string,
@@ -183,124 +168,4 @@ export class Snappay {
         };
     }
 
-    // async handleNotify(paymentId: string, amount: number) {
-    //     // logger.info("********** BEGIN SNAPPAY NOTIFY PROCESS ************");
-    //     const paymentActionCode = TransactionAction.PAY_BY_WECHAT.code;
-    //     // logger.info("Call process after pay");
-    //     await this.orderEntity.processAfterPay(paymentId, paymentActionCode, amount, '');
-    //     // logger.info("********** END SNAPPAY NOTIFY PROCESS ************");
-    //     return;
-    //   }
-
-
-    payv1(
-        accountId: string,
-        appCode: string,
-        paymentActionCode: string,
-        amount: number,
-        returnUrl: string,
-        description: string,
-        paymentId: string,
-        browserType: string
-      ) {
-        const self = this;
-    
-        return new Promise((resolve, reject) => {
-          const data = this.getPostData(
-            'ALIPAY',
-            'pay.webpay',
-            paymentId,
-            amount,
-            returnUrl,
-            description,
-            browserType
-          );
-          const params = this.signPostData(data);
-          const options = {
-            hostname: "open.snappay.ca",
-            port: 443,
-            path: "/api/gateway",
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json", // 'Content-Length': Buffer.byteLength(data)
-            },
-          };
-    
-          // const message = "paymentId:" + paymentId + ", params:" + JSON.stringify(params)
-          // this.addLogToDB(accountId, "snappay req", '', message).then(() => { });
-    
-          try {
-            const post_req = https.request(options, (res: IncomingMessage) => {
-              let ss = "";
-              res.on("data", (d) => {
-                ss += d;
-              });
-              res.on("end", (r: any) => {
-                  resolve(JSON.parse(ss));
-                // if (ss) { // { code, data, msg, total, psn, sign }
-                //   const ret = JSON.parse(ss); // s.data = {out_order_no:x, merchant_no:x, trans_status:x, h5pay_url}
-                //   const code = ret ? ret.code : "";
-                //   const message = "sign:" + (ret ? ret.sign : "N/A") + ", msg:" + (ret ? ret.msg : "N/A");
-                //   const rsp: IPaymentResponse = {
-                //     status: ret && ret.msg === "success" ? ResponseStatus.SUCCESS : ResponseStatus.FAIL,
-                //     code, // stripe/snappay code
-                //     decline_code: "", // stripe decline_code
-                //     msg: message, // stripe/snappay retrun message
-                //     chargeId: "", // stripe { chargeId:x }
-                //     url: ret.data && ret.data[0] ? ret.data[0].h5pay_url : "", // snappay data[0].h5pay_url
-                //   };
-                //   if (ret && ret.msg === "success") {
-                //     resolve(rsp);
-                //   } else {
-                //     // this.addLogToDB(accountId, "snappay rsp", '', message).then(() => {
-                //       resolve(rsp);
-                //     });
-                //   }
-                // } else {
-                //   const rsp: IPaymentResponse = {
-                //     status: ResponseStatus.FAIL,
-                //     code: "UNKNOWN_ISSUE", // snappay return code
-                //     decline_code: "", // stripe decline_code
-                //     msg: "UNKNOWN_ISSUE", // snappay retrun message
-                //     chargeId: "", // stripe { chargeId:x }
-                //     url: "", // for snappay data[0].h5pay_url
-                //   };
-                //   resolve(rsp);
-                // }
-              });
-            });
-      
-            post_req.on("error", (error: any) => {
-            //   const message = JSON.stringify(error);
-            //   self.addLogToDB(accountId, 'snappay error', '', message).then(() => {
-            //     // Reject on request error.
-            //     const rsp: IPaymentResponse = {
-            //       status: ResponseStatus.FAIL,
-            //       code: "UNKNOWN_ISSUE", // snappay return code
-            //       decline_code: "", // stripe decline_code
-            //       msg: message, // snappay retrun message
-            //       chargeId: "", // stripe { chargeId:x }
-            //       url: "", // for snappay data[0].h5pay_url
-            //     };
-            //     resolve(rsp);
-            // });
-        resolve(error);
-      
-            });
-            post_req.write(JSON.stringify(params));
-            post_req.end();
-          } catch (e) {
-            // console.error(e);
-            // resolve({
-            //   status: ResponseStatus.FAIL,
-            //   code: "UNKNOWN_ISSUE",
-            //   decline_code: "",
-            //   msg: e,
-            //   chargeId: "",
-            //   url: ""
-            // });
-            resolve(e);
-          }
-        });
-      }
 }
