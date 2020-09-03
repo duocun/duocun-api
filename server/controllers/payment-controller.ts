@@ -1,19 +1,24 @@
 import { Request, Response } from 'express';
 
 import { Snappay, SnappayPaymentMethod } from '../models/payment/snappay';
+import { Stripe } from '../models/payment/stripe';
+
 import { TransactionAction } from '../models/transaction';
 import { Order } from '../models/order';
 import { DB } from '../db';
 import { Log } from '../models/log';
 import { IPaymentResponse } from '../models/payment/index';
+import { Code } from './controller';
 
 export class PaymentController {
     
     snappay: Snappay;
+    stripe: Stripe;
     orderModel: Order;
 
     constructor(db: DB) {
         this.snappay = new Snappay();
+        this.stripe = new Stripe();
         this.orderModel = new Order(db);
     }
 
@@ -69,4 +74,27 @@ export class PaymentController {
           });
         }
     }
+
+
+    // Stripe
+    stripePay(req: Request, res: Response) {
+    // const appType = req.body.appType;
+    const paymentActionCode = req.body.paymentActionCode;
+    const paymentMethodId = req.body.paymentMethodId;
+    const paymentId = req.body.paymentId;
+    const merchantNames = ['Duocun Inc.']; // req.body.merchantNames
+    const accountId = req.body.accountId;
+    const accountName = req.body.accountName;
+    const note = req.body.note;
+    let amount = +req.body.amount;
+
+    res.setHeader("Content-Type", "application/json");
+    this.stripe.pay(paymentActionCode, paymentMethodId, accountId, accountName, amount, note, paymentId, merchantNames).then((rsp: any) => {
+      res.send(JSON.stringify({
+        code: rsp ? Code.SUCCESS : Code.FAIL,
+        data: rsp,
+      })); // IPaymentResponse
+    });
+  }
+
 }
