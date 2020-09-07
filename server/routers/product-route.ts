@@ -278,11 +278,13 @@ class ProductController extends Model {
             const schedules: {
               date: string;
               time: string;
+              margin: number;
             }[] = [];
             dates.forEach(date => {
               schedules.push({
                 date,
                 time: '10:00',
+                margin: endTimeMargin,
               });
             });
             return res.json({
