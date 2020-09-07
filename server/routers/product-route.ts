@@ -225,7 +225,6 @@ class ProductController extends Model {
             const today = moment().format('YYYY-MM-DD');
             let dates: string[] = [];
             availableArea.periods.forEach(period => {
-              console.log(moment(period.startDate));
               period.dows.forEach(dow => {
                 const diff1 = moment(today).diff(moment(today).day(dow), 'h');
                 if (diff1 < 1
@@ -266,7 +265,7 @@ class ProductController extends Model {
                   return false;
                 }
                 if (date === moment().add(1, 'd').format('YYYY-MM-DD')) {
-                  if (moment().diff(moment(date), 'h') < endTimeMargin) {
+                  if (moment().diff(moment(date), 'h') < endTimeMargin + 1) {
                     return true;
                   }
                   return false;
