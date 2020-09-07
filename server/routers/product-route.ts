@@ -275,9 +275,19 @@ class ProductController extends Model {
               });
             }
             dates.sort();
+            const schedules: {
+              date: string;
+              time: string;
+            }[] = [];
+            dates.forEach(date => {
+              schedules.push({
+                date,
+                time: '10:00',
+              });
+            });
             return res.json({
               code: Code.SUCCESS,
-              data: dates,
+              data: schedules,
             });
           }
         }
