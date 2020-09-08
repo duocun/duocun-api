@@ -1,40 +1,35 @@
-// import { expect } from 'chai';
-
-// import { DB } from "../../db";
-// import { Config } from "../../config";
-// import { Account, IAccount, VerificationError } from "../../models/account";
+import { expect } from 'chai';
+import { DB } from "../../db";
+import { Config } from "../../config";
+import { Account, IAccount, VerificationError } from "../../models/account";
 
 // import bcrypt from "bcrypt";
 // import jwt from "jsonwebtoken";
 
-// describe('doVerfiyV2', () => {
-//   const db: any = new DB();
-//   const cfg: any = new Config();
-//   let accountModel: Account;
-//   let connection: any = null;
-//   let account: IAccount;
+describe('verifyPhoneNumber', () => {
+  const db: any = new DB();
+  const cfg: any = new Config();
+  let accountModel: Account;
+  let connection: any = null;
 
-//   before(function (done) {
-//     db.init(cfg.DATABASE).then((dbClient: any) => {
-//       connection = dbClient;
-//       accountModel = new Account(db);
-//       done();
-//     });
-//   });
+  before(async function () {
+    const dbClient = await db.init(cfg.DATABASE);
+    connection = dbClient;
+    accountModel = new Account(db);
+  });
 
-//   after(function (done) {
-//     connection.close();
-//     done();
-//   });
+  after(async function () {
+    connection.close();
+  });
 
-//   it('should verify fail', (done) => {
-//     const loggedInAccountId = '5e00d408d90bbb02130cc43c';
-//     accountModel.doVerifyV2('416906546X', '1111', loggedInAccountId).then((x: any) => {
-//       expect(x.verified).to.equal(false);
-//       expect(x.err).to.equal(VerificationError.NO_PHONE_NUMBER_BIND);
-//       done();
-//     });
-//   });
+  it('should verify fail', async () => {
+    const loggedInAccountId = '5e41d12b7dd27a75d6c929d8';
+    const x = await accountModel.verifyPhoneNumber('1111111111', '4146', loggedInAccountId);
+    expect(x.verified).to.equal(false);
+    expect(x.err).to.equal(VerificationError.NO_PHONE_NUMBER_BIND);
+  });
+
+});
 
 //   it('should verify fail', (done) => {
 //     const loggedInAccountId = '5d953ff91a3174727b9a7c70';

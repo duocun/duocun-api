@@ -6,7 +6,7 @@ import { Config } from "../config";
 import { Utils } from "../utils";
 import moment from "moment";
 import { EventLog } from "./event-log";
-import { ObjectID } from "../../node_modules/@types/mongodb";
+import { ObjectID, ObjectId } from "mongodb";
 
 const saltRounds = 10;
 
@@ -323,78 +323,196 @@ export class Account extends Model {
     }
   }
 
-  verifyPhoneNumber(phone: string, code: string, loggedInAccountId: string) {
-    return new Promise((resolve, reject) => {
-      const cfg = new Config();
 
-      this.findOne({ phone }).then((account) => {
-        if (account && account.password) {
-          delete account.password;
-        }
-        if (loggedInAccountId) {
-          if (account) {
-            // phone has account
-            if (account._id.toString() !== loggedInAccountId) {
-              resolve({
-                verified: false,
-                err: VerificationError.PHONE_NUMBER_OCCUPIED,
-                account,
-              });
-            } else {
-              if (
-                account.verificationCode &&
-                code === account.verificationCode
-              ) {
-                const tokenId = jwt.sign(
-                  { accountId: account._id.toString() },
-                  cfg.JWT.SECRET,
-                  {
-                    expiresIn: "30d",
-                  }
-                ); // SHA256
-                resolve({
-                  verified: true,
-                  err: VerificationError.NONE,
-                  account,
-                  tokenId,
-                });
-              } else {
-                resolve({
-                  verified: false,
-                  err: VerificationError.WRONG_CODE,
-                  account,
-                });
-              }
-            }
-          } else {
+  /*
+  *   loggedInAccountId --- account that logged in by 3rd party or by phone
+  *   phone --- phone number that provided by logged in account
+  */
+  async verifyPhoneNumber(phone: string, code: string, loggedInAccountId: string) {
+    const cfg = new Config();
+    const account = await this.findOne({ phone });
+
+    if (account && account.password) {
+      delete account.password;
+    }
+
+    if (loggedInAccountId) {
+      if (account) { // if db has account with the phone
+        const accountId = account._id.toString();
+
+        if (accountId !== loggedInAccountId) {
+          return {
+            verified: false,
+            err: VerificationError.PHONE_NUMBER_OCCUPIED,
+            account,
+          };
+        } else {
+          if (account.verificationCode && code === account.verificationCode) {
             const tokenId = jwt.sign(
-              { accountId: loggedInAccountId },
+              { accountId },
               cfg.JWT.SECRET,
               {
                 expiresIn: "30d",
               }
             ); // SHA256
-            resolve({
+            return {
               verified: true,
               err: VerificationError.NONE,
               account,
               tokenId,
-            }); // please resend code
+            };
+          } else {
+            return {
+              verified: false,
+              err: VerificationError.WRONG_CODE,
+              account,
+            };
+          }
+        }
+      } else { // db doesn't have account with the phone
+        const tokenId = jwt.sign(
+          { accountId: loggedInAccountId },
+          cfg.JWT.SECRET,
+          {
+            expiresIn: "30d",
+          }
+        ); // SHA256
+        return {
+          verified: true,
+          err: VerificationError.NONE,
+          account,
+          tokenId,
+        }; // please resend code
+      }
+    } else { // enter from web page
+      if (account) {
+        if (account.openId) {
+          return {
+            verified: false,
+            err: VerificationError.PHONE_NUMBER_OCCUPIED,
+            account,
+          };
+        } else {
+          if (account.verificationCode && code === account.verificationCode) {
+            const tokenId = jwt.sign(
+              { accountId: account._id.toString() },
+              cfg.JWT.SECRET,
+              {
+                expiresIn: "30d",
+              }
+            ); // SHA256
+            return {
+              verified: true,
+              err: VerificationError.NONE,
+              account,
+              tokenId,
+            }; // tokenId: tokenId,
+          } else {
+            return {
+              verified: false,
+              err: VerificationError.WRONG_CODE,
+              account,
+            };
+          }
+        }
+      } else {
+        return {
+          verified: false,
+          err: VerificationError.NO_PHONE_NUMBER_BIND,
+          account,
+        }; // // please resend code
+      }
+    }
+}
+
+doVerifyAndLogin(phone: string, code: string, loggedInAccountId: string) {
+  return new Promise((resolve, reject) => {
+    if (loggedInAccountId) {
+      // logged in
+      this.findOne({ phone }).then((account: IAccount) => {
+        if (account) {
+          // phone has an account
+          if (account._id.toString() !== loggedInAccountId) {
+            resolve({
+              verified: false,
+              err: VerificationError.PHONE_NUMBER_OCCUPIED,
+            });
+          } else {
+            if (
+              account.verificationCode &&
+              code === account.verificationCode
+            ) {
+              if (account.password) {
+                delete account.password;
+              }
+              account.verified = true;
+              this.updateOne({ _id: account._id }, { verified: true }).then(
+                () => {
+                  if (account.type === AccountType.TEMP) {
+                    resolve({
+                      verified: true,
+                      err: VerificationError.REQUIRE_SIGNUP,
+                      account: account,
+                    });
+                  } else {
+                    resolve({
+                      verified: true,
+                      err: VerificationError.NONE,
+                      account: account,
+                    });
+                  }
+                }
+              );
+            } else {
+              resolve({ verified: false, err: VerificationError.WRONG_CODE });
+            }
           }
         } else {
-          // enter from web page
-          if (account) {
+          // resolve({ verified: false, err: VerificationError.NO_PHONE_NUMBER_BIND });
+          resolve({
+            verified: true,
+            err: VerificationError.NONE,
+            account: account,
+          });
+        }
+      });
+    } else {
+      // loggedInAccountId = ''
+      this.findOne({ phone: phone }).then((account) => {
+        if (account) {
+          if (account.type === AccountType.TEMP) {
+            if (
+              account.verificationCode &&
+              code === account.verificationCode
+            ) {
+              if (account.password) {
+                delete account.password;
+              }
+              account.verified = true;
+              this.updateOne({ _id: account._id }, { verified: true }).then(
+                () => {
+                  resolve({
+                    verified: true,
+                    err: VerificationError.REQUIRE_SIGNUP,
+                    account: account,
+                  });
+                }
+              );
+            } else {
+              resolve({ verified: false, err: VerificationError.WRONG_CODE });
+            }
+          } else {
             if (account.openId) {
               resolve({
                 verified: false,
                 err: VerificationError.PHONE_NUMBER_OCCUPIED,
-                account,
               });
             } else {
               if (
                 account.verificationCode &&
                 code === account.verificationCode
               ) {
+                const cfg = new Config();
                 const tokenId = jwt.sign(
                   { accountId: account._id.toString() },
                   cfg.JWT.SECRET,
@@ -402,92 +520,6 @@ export class Account extends Model {
                     expiresIn: "30d",
                   }
                 ); // SHA256
-                resolve({
-                  verified: true,
-                  err: VerificationError.NONE,
-                  account,
-                  tokenId,
-                }); // tokenId: tokenId,
-              } else {
-                resolve({
-                  verified: false,
-                  err: VerificationError.WRONG_CODE,
-                  account,
-                });
-              }
-            }
-          } else {
-            resolve({
-              verified: false,
-              err: VerificationError.NO_PHONE_NUMBER_BIND,
-              account,
-            }); // // please resend code
-          }
-        }
-      });
-    });
-  }
-
-  doVerifyAndLogin(phone: string, code: string, loggedInAccountId: string) {
-    return new Promise((resolve, reject) => {
-      if (loggedInAccountId) {
-        // logged in
-        this.findOne({ phone }).then((account: IAccount) => {
-          if (account) {
-            // phone has an account
-            if (account._id.toString() !== loggedInAccountId) {
-              resolve({
-                verified: false,
-                err: VerificationError.PHONE_NUMBER_OCCUPIED,
-              });
-            } else {
-              if (
-                account.verificationCode &&
-                code === account.verificationCode
-              ) {
-                if (account.password) {
-                  delete account.password;
-                }
-                account.verified = true;
-                this.updateOne({ _id: account._id }, { verified: true }).then(
-                  () => {
-                    if (account.type === AccountType.TEMP) {
-                      resolve({
-                        verified: true,
-                        err: VerificationError.REQUIRE_SIGNUP,
-                        account: account,
-                      });
-                    } else {
-                      resolve({
-                        verified: true,
-                        err: VerificationError.NONE,
-                        account: account,
-                      });
-                    }
-                  }
-                );
-              } else {
-                resolve({ verified: false, err: VerificationError.WRONG_CODE });
-              }
-            }
-          } else {
-            // resolve({ verified: false, err: VerificationError.NO_PHONE_NUMBER_BIND });
-            resolve({
-              verified: true,
-              err: VerificationError.NONE,
-              account: account,
-            });
-          }
-        });
-      } else {
-        // loggedInAccountId = ''
-        this.findOne({ phone: phone }).then((account) => {
-          if (account) {
-            if (account.type === AccountType.TEMP) {
-              if (
-                account.verificationCode &&
-                code === account.verificationCode
-              ) {
                 if (account.password) {
                   delete account.password;
                 }
@@ -496,106 +528,59 @@ export class Account extends Model {
                   () => {
                     resolve({
                       verified: true,
-                      err: VerificationError.REQUIRE_SIGNUP,
+                      err: VerificationError.NONE,
+                      tokenId: tokenId,
                       account: account,
                     });
                   }
                 );
               } else {
-                resolve({ verified: false, err: VerificationError.WRONG_CODE });
-              }
-            } else {
-              if (account.openId) {
                 resolve({
                   verified: false,
-                  err: VerificationError.PHONE_NUMBER_OCCUPIED,
+                  err: VerificationError.WRONG_CODE,
                 });
-              } else {
-                if (
-                  account.verificationCode &&
-                  code === account.verificationCode
-                ) {
-                  const cfg = new Config();
-                  const tokenId = jwt.sign(
-                    { accountId: account._id.toString() },
-                    cfg.JWT.SECRET,
-                    {
-                      expiresIn: "30d",
-                    }
-                  ); // SHA256
-                  if (account.password) {
-                    delete account.password;
-                  }
-                  account.verified = true;
-                  this.updateOne({ _id: account._id }, { verified: true }).then(
-                    () => {
-                      resolve({
-                        verified: true,
-                        err: VerificationError.NONE,
-                        tokenId: tokenId,
-                        account: account,
-                      });
-                    }
-                  );
-                } else {
-                  resolve({
-                    verified: false,
-                    err: VerificationError.WRONG_CODE,
-                  });
-                }
               }
             }
-          } else {
-            resolve({
-              verified: false,
-              err: VerificationError.NO_PHONE_NUMBER_BIND,
-            });
           }
-        });
-      }
-    });
-  }
-
-  // v1 --- deprecated
-  // doVerifyPhone(phone: string, code: string) {
-  //   return new Promise((resolve, reject) => {
-  //     this.findOne({ phone: phone }).then((a: IAccount) => {
-  //       const verified = a && (a.verificationCode.toString() === code);
-  //       this.updateOne({ _id: a._id.toString() }, { verified: verified }).then((result) => {
-  //         resolve(verified);
-  //       });
-  //     });
-  //   });
-  // }
-
-  // To do: test token is undefined or null
-  async getAccountByToken(tokenId: string) {
-    if (tokenId && tokenId !== "undefined" && tokenId !== "null") {
-      try {
-        const cfg = new Config();
-        // @ts-ignore
-        const _id = jwt.verify(tokenId, cfg.JWT.SECRET).accountId;
-        if (_id) {
-          const account = await this.findOne({ _id });
-          if (account && account.password) {
-            delete account.password;
-          }
-          return account;
         } else {
-          const message =
-            "getAccountByToken Fail: jwt verify fail, tokenId:" + tokenId;
-          await this.eventLogModel.addLogToDB(
-            DEBUG_ACCOUNT_ID,
-            "jwt",
-            "jwt verify fail",
-            message
-          );
-          return;
+          resolve({
+            verified: false,
+            err: VerificationError.NO_PHONE_NUMBER_BIND,
+          });
         }
-      } catch (e) {
-        const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${
-          e || " Exception"
-        }`;
+      });
+    }
+  });
+}
+
+// v1 --- deprecated
+// doVerifyPhone(phone: string, code: string) {
+//   return new Promise((resolve, reject) => {
+//     this.findOne({ phone: phone }).then((a: IAccount) => {
+//       const verified = a && (a.verificationCode.toString() === code);
+//       this.updateOne({ _id: a._id.toString() }, { verified: verified }).then((result) => {
+//         resolve(verified);
+//       });
+//     });
+//   });
+// }
+
+// To do: test token is undefined or null
+async getAccountByToken(tokenId: string) {
+  if (tokenId && tokenId !== "undefined" && tokenId !== "null") {
+    try {
+      const cfg = new Config();
+      // @ts-ignore
+      const _id = jwt.verify(tokenId, cfg.JWT.SECRET).accountId;
+      if (_id) {
+        const account = await this.findOne({ _id });
+        if (account && account.password) {
+          delete account.password;
+        }
+        return account;
+      } else {
+        const message =
+          "getAccountByToken Fail: jwt verify fail, tokenId:" + tokenId;
         await this.eventLogModel.addLogToDB(
           DEBUG_ACCOUNT_ID,
           "jwt",
@@ -604,148 +589,156 @@ export class Account extends Model {
         );
         return;
       }
-    } else {
-      const message =
-        "getAccountByToken Fail: Then tokenId is null, tokenId:" + tokenId;
+    } catch (e) {
+      const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${
+        e || " Exception"
+        }`;
       await this.eventLogModel.addLogToDB(
         DEBUG_ACCOUNT_ID,
-        "getAccountByToken",
-        "tokenId is null",
+        "jwt",
+        "jwt verify fail",
         message
       );
       return;
     }
+  } else {
+    const message =
+      "getAccountByToken Fail: Then tokenId is null, tokenId:" + tokenId;
+    await this.eventLogModel.addLogToDB(
+      DEBUG_ACCOUNT_ID,
+      "getAccountByToken",
+      "tokenId is null",
+      message
+    );
+    return;
   }
+}
 
-  createTmpAccount(phone: string, verificationCode: string): Promise<IAccount> {
-    return new Promise((resolve, reject) => {});
-  }
+createTmpAccount(phone: string, verificationCode: string): Promise < IAccount > {
+  return new Promise((resolve, reject) => { });
+}
 
-  // There are two senarios for signup.
-  // 1. after user verified phone number, there is a button for signup. For this senario, phone number and verification code are mandatory
-  // 2. when user login from 3rd party, eg. from wechat, it will do signup. For this senario, wechat openid is mandaroty.
-  // only allow to signup with phone number and verification code (password)
-  doSignup(phone: string, verificationCode: string): Promise<IAccount> {
-    return new Promise((resolve, reject) => {
-      if (phone) {
-        this.findOne({ phone: phone }).then((x: IAccount) => {
-          if (x) {
-            const updates = {
-              phone: phone,
-              verificationCode: verificationCode,
-              type: "client",
-            };
-            this.updateOne({ _id: x._id.toString() }, updates).then(() => {
-              if (x && x.password) {
-                delete x.password;
-              }
-              x = { ...x, ...updates };
-              resolve(x);
-            });
-          } else {
-            // should not go here
-            const data = {
-              username: phone,
-              phone: phone,
-              type: AccountType.TEMP, // tmp user are those verified phone but did not signup under agreement
-              balance: 0,
-              verificationCode: verificationCode,
-              verified: false,
-              attributes: [],
-              created: moment().toISOString(),
-            };
-            this.insertOne(data).then((x: IAccount) => {
-              resolve(x);
-            });
-          }
-        });
-      } else {
-        resolve();
-      }
-    });
-  }
-
-  // When user login from 3rd party, eg. from wechat, it will do signup. For this senario, wechat openid is mandaroty.
-  doWechatSignup(
-    openId: string,
-    username: string,
-    imageurl: string,
-    sex: number
-  ): Promise<IAccount> {
-    return new Promise((resolve, reject) => {
-      if (openId) {
-        this.findOne({ openId: openId, type: { $ne: "tmp" },  }).then((x: IAccount) => {
-          if (x) {
-            const updates = {
-              username: username,
-              imageurl: imageurl,
-              sex: sex,
-            };
-            this.updateOne({ _id: x._id.toString() }, updates).then(() => {
+// There are two senarios for signup.
+// 1. after user verified phone number, there is a button for signup. For this senario, phone number and verification code are mandatory
+// 2. when user login from 3rd party, eg. from wechat, it will do signup. For this senario, wechat openid is mandaroty.
+// only allow to signup with phone number and verification code (password)
+doSignup(phone: string, verificationCode: string): Promise < IAccount > {
+  return new Promise((resolve, reject) => {
+    if (phone) {
+      this.findOne({ phone: phone }).then((x: IAccount) => {
+        if (x) {
+          const updates = {
+            phone: phone,
+            verificationCode: verificationCode,
+            type: "client",
+          };
+          this.updateOne({ _id: x._id.toString() }, updates).then(() => {
+            if (x && x.password) {
               delete x.password;
-              x = { ...x, ...updates };
-              resolve(x);
-            });
-          } else {
-            // no account find
-            const data = {
-              username: username,
-              imageurl: imageurl,
-              sex: sex,
-              type: "user",
-              realm: "wechat",
-              openId: openId,
-              // unionId: x.unionid, // not be able to get wechat unionId
-              balance: 0,
-              attributes: [],
-              created: moment().toISOString(),
-            };
-            this.insertOne(data).then((x: IAccount) => {
-              delete x.password;
-              resolve(x);
-            });
-          }
-        });
-      } else {
-        resolve();
-      }
-    });
-  }
-
-  // --------------------------------------------------------------------------------------------------
-  // wechat, google or facebook can not use this request to login
-  // phone    ---  unique phone number, verification code as password by default
-  doLoginByPhone(phone: string, verificationCode: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.findOne({
-        phone: phone,
-        type: { $ne: "tmp" },
-        verified: true,
-      }).then((r: IAccount) => {
-        if (r) {
-          if (r.verificationCode) {
-            if (r.verificationCode === verificationCode) {
-              const cfg = new Config();
-              const tokenId = jwt.sign(
-                { accountId: r._id.toString() },
-                cfg.JWT.SECRET,
-                {
-                  expiresIn: "30d",
-                }
-              ); // SHA256
-              // set new verification code
-              r.verificationCode = this.getRandomCode();
-              this.updateOne({ _id: r._id }, r).then(() => {
-                if (r.password) {
-                  delete r.password;
-                }
-                resolve(tokenId);
-              });
-              // resolve({tokenId: tokenId, account: r});
-            } else {
-              resolve();
-              // resolve({tokenId: '', account: null});
             }
+            x = { ...x, ...updates };
+            resolve(x);
+          });
+        } else {
+          // should not go here
+          const data = {
+            username: phone,
+            phone: phone,
+            type: AccountType.TEMP, // tmp user are those verified phone but did not signup under agreement
+            balance: 0,
+            verificationCode: verificationCode,
+            verified: false,
+            attributes: [],
+            created: moment().toISOString(),
+          };
+          this.insertOne(data).then((x: IAccount) => {
+            resolve(x);
+          });
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+// When user login from 3rd party, eg. from wechat, it will do signup. For this senario, wechat openid is mandaroty.
+doWechatSignup(
+  openId: string,
+  username: string,
+  imageurl: string,
+  sex: number
+): Promise < IAccount > {
+  return new Promise((resolve, reject) => {
+    if (openId) {
+      this.findOne({ openId: openId, type: { $ne: "tmp" }, }).then((x: IAccount) => {
+        if (x) {
+          const updates = {
+            username: username,
+            imageurl: imageurl,
+            sex: sex,
+          };
+          this.updateOne({ _id: x._id.toString() }, updates).then(() => {
+            delete x.password;
+            x = { ...x, ...updates };
+            resolve(x);
+          });
+        } else {
+          // no account find
+          const data = {
+            username: username,
+            imageurl: imageurl,
+            sex: sex,
+            type: "user",
+            realm: "wechat",
+            openId: openId,
+            // unionId: x.unionid, // not be able to get wechat unionId
+            balance: 0,
+            attributes: [],
+            created: moment().toISOString(),
+          };
+          this.insertOne(data).then((x: IAccount) => {
+            delete x.password;
+            resolve(x);
+          });
+        }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+// --------------------------------------------------------------------------------------------------
+// wechat, google or facebook can not use this request to login
+// phone    ---  unique phone number, verification code as password by default
+doLoginByPhone(phone: string, verificationCode: string): Promise < any > {
+  return new Promise((resolve, reject) => {
+    this.findOne({
+      phone: phone,
+      type: { $ne: "tmp" },
+      verified: true,
+    }).then((r: IAccount) => {
+      if (r) {
+        if (r.verificationCode) {
+          if (r.verificationCode === verificationCode) {
+            const cfg = new Config();
+            const tokenId = jwt.sign(
+              { accountId: r._id.toString() },
+              cfg.JWT.SECRET,
+              {
+                expiresIn: "30d",
+              }
+            ); // SHA256
+            // set new verification code
+            r.verificationCode = this.getRandomCode();
+            this.updateOne({ _id: r._id }, r).then(() => {
+              if (r.password) {
+                delete r.password;
+              }
+              resolve(tokenId);
+            });
+            // resolve({tokenId: tokenId, account: r});
           } else {
             resolve();
             // resolve({tokenId: '', account: null});
@@ -754,140 +747,144 @@ export class Account extends Model {
           resolve();
           // resolve({tokenId: '', account: null});
         }
-      });
-    });
-  }
-
-  // --------------------------------------------------------------------------------------------------
-  // wechat, google or facebook can not use this request to login
-  // username --- optional, can be null, unique  username
-  // password --- mandadory field
-  doLogin(username: string, password: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      let query = null;
-      if (username) {
-        query = { username: username };
-      }
-
-      if (query) {
-        this.findOne(query).then((r: IAccount) => {
-          if (r && r.password) {
-            bcrypt.compare(password, r.password, (err, matched) => {
-              if (matched) {
-                r.password = "";
-                const cfg = new Config();
-                const tokenId = jwt.sign(
-                  { accountId: r._id.toString() },
-                  cfg.JWT.SECRET,
-                  {
-                    expiresIn: "30d",
-                  }
-                ); // SHA256
-                resolve(tokenId);
-              } else {
-                resolve();
-              }
-            });
-          } else {
-            return resolve();
-          }
-        });
       } else {
         resolve();
+        // resolve({tokenId: '', account: null});
       }
     });
-  }
+  });
+}
 
-  // return tokenId
-  async wechatLoginByOpenId(accessToken: string, openId: string) {
-    try {
-      const x = await this.utils.getWechatUserInfo(accessToken, openId);
-      if (x && x.openid) {
-        const account = await this.doWechatSignup(
-          x.openid,
-          x.nickname,
-          x.headimgurl,
-          x.sex
-        );
-        if (account && account._id) {
-          const accountId = `${account._id}`;
-          const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, {
-            expiresIn: "30d",
-          }); // SHA256
-          return tokenId;
+// --------------------------------------------------------------------------------------------------
+// wechat, google or facebook can not use this request to login
+// username --- optional, can be null, unique  username
+// password --- mandadory field
+doLogin(username: string, password: string): Promise < string > {
+  return new Promise((resolve, reject) => {
+    let query = null;
+    if (username) {
+      query = { username: username };
+    }
+
+    if (query) {
+      this.findOne(query).then((r: IAccount) => {
+        if (r && r.password) {
+          bcrypt.compare(password, r.password, (err, matched) => {
+            if (matched) {
+              r.password = "";
+              const cfg = new Config();
+              const tokenId = jwt.sign(
+                { accountId: r._id.toString() },
+                cfg.JWT.SECRET,
+                {
+                  expiresIn: "30d",
+                }
+              ); // SHA256
+              resolve(tokenId);
+            } else {
+              resolve();
+            }
+          });
         } else {
-          await this.eventLogModel.addLogToDB(
-            DEBUG_ACCOUNT_ID,
-            "signup by wechat",
-            "",
-            "signup by wechat fail"
-          );
-          return null;
+          return resolve();
         }
+      });
+    } else {
+      resolve();
+    }
+  });
+}
+
+// return tokenId
+async wechatLoginByOpenId(accessToken: string, openId: string) {
+  try {
+    const x = await this.utils.getWechatUserInfo(accessToken, openId);
+    if (x && x.openid) {
+      const account = await this.doWechatSignup(
+        x.openid,
+        x.nickname,
+        x.headimgurl,
+        x.sex
+      );
+      if (account && account._id) {
+        const accountId = `${account._id}`;
+        const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, {
+          expiresIn: "30d",
+        }); // SHA256
+        return tokenId;
       } else {
         await this.eventLogModel.addLogToDB(
           DEBUG_ACCOUNT_ID,
-          "login by openid",
+          "signup by wechat",
           "",
-          "wechat get user info fail"
+          "signup by wechat fail"
         );
-        return null;
-      }
-    } catch (err) {
-      const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${
-        err || "ByOpenId Exception"
-      }`;
-      await this.eventLogModel.addLogToDB(
-        DEBUG_ACCOUNT_ID,
-        "login by openid",
-        "",
-        message
-      );
-      return null;
-    }
-  }
-
-  // code [string] --- wechat authentication code
-  // return {tokenId, accessToken, openId, expiresIn}
-  async wechatLoginByCode(code: string) {
-    if (code) {
-      try {
-        const r = await this.utils.getWechatAccessToken(code); // error code 40163
-        if (r && r.access_token && r.openid) {
-          // wechat token
-          const accessToken = r.access_token;
-          const openId = r.openid;
-          const expiresIn = r.expires_in; // 2h
-          const refreshToken = r.refresh_token;
-          const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
-          return { tokenId, accessToken, openId, expiresIn };
-        } else {
-          const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
-            r & r.msg || "LoginByCode Exception"
-          }`;
-          console.error(message);
-          await this.eventLogModel.addLogToDB(
-            DEBUG_ACCOUNT_ID,
-            "login by code",
-            "",
-            message
-          );
-          return null;
-        }
-      } catch (e) {
-        console.error(e);
         return null;
       }
     } else {
       await this.eventLogModel.addLogToDB(
         DEBUG_ACCOUNT_ID,
-        "login by code",
+        "login by openid",
         "",
-        "Empty wechat authCode"
+        "wechat get user info fail"
       );
       return null;
     }
+  } catch (err) {
+    const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${
+      err || "ByOpenId Exception"
+      }`;
+    await this.eventLogModel.addLogToDB(
+      DEBUG_ACCOUNT_ID,
+      "login by openid",
+      "",
+      message
+    );
+    return null;
   }
+}
+
+// code [string] --- wechat authentication code
+// return {tokenId, accessToken, openId, expiresIn}
+async wechatLoginByCode(code: string) {
+  if (code) {
+    try {
+      const r = await this.utils.getWechatAccessToken(code); // error code 40163
+      if (r && r.access_token && r.openid) {
+        // wechat token
+        const accessToken = r.access_token;
+        const openId = r.openid;
+        const expiresIn = r.expires_in; // 2h
+        const refreshToken = r.refresh_token;
+        const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
+        return { tokenId, accessToken, openId, expiresIn };
+      } else {
+        const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
+          r & r.msg || "LoginByCode Exception"
+          }`;
+        console.error(message);
+        await this.eventLogModel.addLogToDB(
+          DEBUG_ACCOUNT_ID,
+          "login by code",
+          "",
+          message
+        );
+        return null;
+      }
+    } catch (e) {
+      console.error(e);
+      return null;
+    }
+  } else {
+    await this.eventLogModel.addLogToDB(
+      DEBUG_ACCOUNT_ID,
+      "login by code",
+      "",
+      "Empty wechat authCode"
+    );
+    return null;
+  }
+}
 
   // cb --- function(errors)
   // validateLoginPassword( user, hashedPassword, cb ){
@@ -1006,4 +1003,112 @@ export class Account extends Model {
   //     });
   //   });
   // }
+
+
+
+  async saveProfile(token: string, newPhone: string, code: string, secondPhone: string) {
+    const cfg = new Config();
+    let accountId = "";
+    try {
+        //@ts-ignore
+        accountId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
+    } catch (e) {
+        console.error(e);
+        // return res.send(JSON.stringify({
+        //     code: Code.FAIL,
+        //     message: "authentication failed"
+        // }));
+    }
+    
+    let account = await this.findOne({ _id: new ObjectId(accountId) });
+    if (!account) {
+        // return res.send(JSON.stringify({
+        //     code: Code.FAIL,
+        //     message: "no such account"
+        // }));
+    }
+    // logger.info("--- BEGIN ACCOUNT PROFILE CHANGE ---");
+    // logger.info(`Account ID: ${account._id}, username: ${account.username}`);
+    // let { location, secondPhone, newPhone, code, username } = req.body;
+    // logger.info(`newPhone: ${newPhone}, oldPhone: ${account.phone}`)
+    
+    if (newPhone !== account.phone) {
+        // logger.info("trying to change phone number");
+        if (account.newPhone === newPhone && account.verificationCode === code) {
+            // find existing account with new phone
+            // logger.info("verification code matches");
+            const existingAccount = await this.findOne({ phone: newPhone });
+            if (existingAccount && existingAccount._id.toString() !== account._id.toString()) {
+                // logger.info(`Account with same phone number exists. Account ID: ${existingAccount._id}, username: ${existingAccount.username}`);
+                // logger.info("merge two accounts");
+                existingAccount.imageurl = existingAccount.imageurl || account.imageurl;
+                existingAccount.realm = existingAccount.realm || account.realm;
+                existingAccount.openId = existingAccount.openId || account.openId;
+                existingAccount.unionId = existingAccount.unionId || account.unionId;
+                existingAccount.visited = existingAccount.visited || account.visited;
+                existingAccount.balance = (existingAccount.balance || 0) + (account.balance || 0);
+                existingAccount.sex = existingAccount.sex === undefined ? account.sex : existingAccount.sex;
+                existingAccount.attributes = existingAccount.attributes || account.attributes;
+                
+                if (existingAccount.type && existingAccount.type != 'client' && existingAccount.type != 'user') {
+
+                } else {
+                    existingAccount.type = existingAccount.type || account.type;
+                }
+                if (account.type && account.type != 'client' && account.type != 'user' && account.type != 'tmp') {
+                    existingAccount.type = account.type;
+                }
+                // logger.info("Disabling new account: " + accountId);
+                
+                account.openId = account.openId + "_disabled";
+                account.unionId = account.unionId + "_disabled";
+                account.phone = account.phone + "_disabled";
+                account.type = "tmp";
+                
+                await this.updateOne({ _id: account._id }, account);
+                
+                account = existingAccount;
+            }
+            account.phone = newPhone;
+            account.newPhone = "";
+            account.verificationCode = this.getRandomCode();
+            account.verified = true;
+        } else {
+            // logger.info("verification code mismatch");
+            // logger.info(`Verification code is ${account.verificationCode}, but received ${code}`);
+            // logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+            // return res.json({
+            //     code: Code.FAIL,
+            //     message: "verification code mismatch"
+            // });
+        }
+    }
+    account.username = username;
+    account.location = location;
+    if (!location) {
+        account.location = null;
+    }
+    if (secondPhone) {
+        secondPhone = secondPhone.substring(0, 2) === "+1" ? secondPhone.substring(2) : secondPhone;
+        account.secondPhone = secondPhone;
+    }
+    try {
+        // logger.info("Saving account");
+        await this.updateOne({ _id: account._id }, account);
+        // logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+        // return res.send(JSON.stringify({
+        //     code: Code.SUCCESS,
+        //     data: jwt.sign({ accountId: account._id.toString() }, this.cfg.JWT.SECRET, {
+        //         expiresIn: '30d'
+        //     })
+        // }));
+    } catch (e) {
+        // logger.error("Save failed, " + e);
+        // logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+        // return res.send(JSON.stringify({
+        //     code: Code.FAIL,
+        //     message: "save failed"
+        // }));
+    }
+}
 }
