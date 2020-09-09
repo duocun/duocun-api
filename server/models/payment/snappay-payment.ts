@@ -3,6 +3,7 @@ import axios from "axios";
 import { IPaymentResponse, ResponseStatus } from "./index";
 import { PaymentError } from "../client-payment";
 import { Log } from '../log';
+import { TransactionAction } from "../transaction";
 
 export const SnappayMethod = {
     WEB: 'pay.webpay',
@@ -16,7 +17,7 @@ export const SnappayPaymentMethod = {
     UNIONPAY: 'UNIONPAY_QR'
 }
 
-export class Snappay {
+export class SnappayPayment {
 
     getPostData(
         method: string,
@@ -166,6 +167,19 @@ export class Snappay {
           url: this.getPaymentUrl(method, ret.data),
           err: ret.msg === 'success' ? PaymentError.NONE : this.getPaymentError(paymentMethod)
         };
+    }
+
+    // fix me
+    getTransactionActionCode(paymentMethod: string) {
+        if (paymentMethod === SnappayPaymentMethod.ALI) {
+            return TransactionAction.PAY_BY_ALI.code;
+        } else if (paymentMethod === SnappayPaymentMethod.WECHAT) {
+            return TransactionAction.PAY_BY_WECHAT.code;
+        } else if (paymentMethod === SnappayPaymentMethod.UNIONPAY) {
+            return TransactionAction.PAY_BY_UNIONPAY.code;
+        } else {
+            return '';
+        }
     }
 
 }

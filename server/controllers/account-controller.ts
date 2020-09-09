@@ -31,6 +31,25 @@ export class AccountController extends Controller {
         this.googleOAuthClient = new OAuth2Client(this.cfg.GOOGLE_AUTH_CLIENT_ID);
     }
 
+
+    async getCurrentUser(req: Request, res: Response): Promise<IAccount|null> {
+        try {
+          let token = req.get("Authorization");
+          let cfg = new Config();
+          if (!token) {
+            return null;
+          }
+          token = token.replace("Bearer ", "");
+          // @ts-ignore
+          const clientId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
+          let account = await this.accountModel.findOne({ _id: clientId });
+          return account;
+        } catch (e) {
+          console.error(e);
+          return null;
+        }
+      }
+      
     loginByPhone(req: Request, res: Response) {
         const phone = req.body.phone;
         const verificationCode = req.body.verificationCode;
