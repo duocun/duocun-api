@@ -595,7 +595,7 @@ export class Account extends Model {
       } catch (e) {
         const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${
           e || " Exception"
-        }`;
+          }`;
         await this.eventLogModel.addLogToDB(
           DEBUG_ACCOUNT_ID,
           "jwt",
@@ -618,7 +618,7 @@ export class Account extends Model {
   }
 
   createTmpAccount(phone: string, verificationCode: string): Promise<IAccount> {
-    return new Promise((resolve, reject) => {});
+    return new Promise((resolve, reject) => { });
   }
 
   // There are two senarios for signup.
@@ -674,7 +674,7 @@ export class Account extends Model {
   ): Promise<IAccount> {
     return new Promise((resolve, reject) => {
       if (openId) {
-        this.findOne({ openId: openId, type: { $ne: "tmp" },  }).then((x: IAccount) => {
+        this.findOne({ openId: openId, type: { $ne: "tmp" }, }).then((x: IAccount) => {
           if (x) {
             const updates = {
               username: username,
@@ -758,44 +758,48 @@ export class Account extends Model {
     });
   }
 
-  // --------------------------------------------------------------------------------------------------
-  // wechat, google or facebook can not use this request to login
-  // username --- optional, can be null, unique  username
-  // password --- mandadory field
-  doLogin(username: string, password: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      let query = null;
-      if (username) {
-        query = { username: username };
-      }
-
-      if (query) {
-        this.findOne(query).then((r: IAccount) => {
-          if (r && r.password) {
-            bcrypt.compare(password, r.password, (err, matched) => {
-              if (matched) {
-                r.password = "";
-                const cfg = new Config();
-                const tokenId = jwt.sign(
-                  { accountId: r._id.toString() },
-                  cfg.JWT.SECRET,
-                  {
-                    expiresIn: "30d",
-                  }
-                ); // SHA256
-                resolve(tokenId);
-              } else {
-                resolve();
-              }
-            });
-          } else {
-            return resolve();
-          }
-        });
-      } else {
-        resolve();
-      }
+  /**
+   * 
+   * @param password 
+   * @param encrypted password in db
+   */
+  comparePassword(password: string, encrypted: string) {
+    return new Promise((resolve) => {
+      bcrypt.compare(password, encrypted, (err, matched) => {
+        resolve({ err, matched });
+      });
     });
+  }
+
+  /**
+   * 
+   * @param username unique  username string
+   * @param password 
+   *
+   */
+  async doLogin(username: string, password: string): Promise<string> {
+    if (username) {
+      const account = await this.findOne({ username });
+      if (account && account.password) {
+        const r: any = await this.comparePassword(password, account.password);
+        if (r.matched) {
+          const accountId = account._id.toString();
+          account.password = "";
+          const tokenId = jwt.sign(
+            { accountId },
+            this.cfg.JWT.SECRET,
+            { expiresIn: "30d" }
+          ); // SHA256
+          return tokenId;
+        } else {
+          return '';
+        }
+      } else {
+        return '';
+      }
+    } else {
+      return '';
+    }
   }
 
   // return tokenId
@@ -836,7 +840,7 @@ export class Account extends Model {
     } catch (err) {
       const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${
         err || "ByOpenId Exception"
-      }`;
+        }`;
       await this.eventLogModel.addLogToDB(
         DEBUG_ACCOUNT_ID,
         "login by openid",
@@ -864,7 +868,7 @@ export class Account extends Model {
         } else {
           const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
             r & r.msg || "LoginByCode Exception"
-          }`;
+            }`;
           console.error(message);
           await this.eventLogModel.addLogToDB(
             DEBUG_ACCOUNT_ID,

@@ -19,11 +19,11 @@ export function PaymentRouter(db: DB) {
 
 
   // input: paymentId, cc, cvd, exp
-  router.post('/moneris/htpay', (req, res) => { controller.monerisPay(req, res) });
-  // input: paymentId
-  router.post('/moneris/preload', (req, res) => { controller.monerisPreload(req, res) });
-  // input: paymentId, ticket
-  router.post('/moneris/receipt', (req, res) => { controller.monerisReceipt(req, res) });
+  router.post('/moneris/pay', (req, res) => { controller.monerisPay(req, res) });
+  // // input: paymentId
+  // router.post('/moneris/preload', (req, res) => { controller.monerisPreload(req, res) });
+  // // input: paymentId, ticket
+  // router.post('/moneris/receipt', (req, res) => { controller.monerisReceipt(req, res) });
 
   return router;
 };
