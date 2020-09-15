@@ -34,14 +34,12 @@ export class AccountController extends Controller {
 
     async getCurrentUser(req: Request, res: Response): Promise<IAccount|null> {
         try {
-          let token = req.get("Authorization");
-          let cfg = new Config();
-          if (!token) {
+          const tokenId: any = this.getAuthToken(req);
+          if (!tokenId) {
             return null;
           }
-          token = token.replace("Bearer ", "");
           // @ts-ignore
-          const clientId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
+          const clientId = (jwt.verify(tokenId, this.cfg.JWT.SECRET)).accountId;
           let account = await this.accountModel.findOne({ _id: clientId });
           return account;
         } catch (e) {

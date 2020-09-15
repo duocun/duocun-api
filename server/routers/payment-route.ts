@@ -1,10 +1,11 @@
 import express from "express";
 import { DB } from "../db";
 import { PaymentController } from "../controllers/payment-controller";
+import { Payment } from "../models/payment";
 
 export function PaymentRouter(db: DB) {
   const router = express.Router();
-  const controller = new PaymentController(db);
+  const controller = new PaymentController(new Payment(db), db);
 
   // input: paymentId
   router.post('/check-payment', (req, res) => { controller.checkPayment(req, res) });

@@ -39,7 +39,7 @@ export class AlphapayPayment extends Payment {
     // logger.info("--- BEGIN ALPHA PAY---");
     // const accountModel = new Account(db);
     // const account = await this.accountModel.getCurrentUser(req, res);
-    const r: any = this.getPaymentInfo(tokenId, paymentId);
+    const r: any = await this.getPaymentInfo(tokenId, paymentId);
     let account;
     let orders;
     let total;

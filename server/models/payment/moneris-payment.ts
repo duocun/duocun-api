@@ -38,7 +38,7 @@ export class MonerisPayment extends Payment{
 
     async preload(tokenId: string, paymentId: string) {
         // logger.info("--- BEGIN ALPHA PAY---");
-        const r: any = this.getPaymentInfo(tokenId, paymentId);
+        const r: any = await this.getPaymentInfo(tokenId, paymentId);
         let account;
         let orders;
         let total;
@@ -166,7 +166,7 @@ export class MonerisPayment extends Payment{
 
   async pay(tokenId: string, paymentId: string, cc: any, cvd: any, exp: any) {
     // logger.info('--- BEGIN MONERIS HT PAY ---');
-    const r: any = this.getPaymentInfo(tokenId, paymentId);
+    const r: any = await this.getPaymentInfo(tokenId, paymentId);
     let account;
     let orders;
     let total;

@@ -572,9 +572,8 @@ export class Account extends Model {
   async getAccountByToken(tokenId: string) {
     if (tokenId && tokenId !== "undefined" && tokenId !== "null") {
       try {
-        const cfg = new Config();
-        // @ts-ignore
-        const _id = jwt.verify(tokenId, cfg.JWT.SECRET).accountId;
+        const r: any = jwt.verify(tokenId, this.cfg.JWT.SECRET);
+        const _id = r.accountId;
         if (_id) {
           const account = await this.findOne({ _id });
           if (account && account.password) {
@@ -784,7 +783,6 @@ export class Account extends Model {
         const r: any = await this.comparePassword(password, account.password);
         if (r.matched) {
           const accountId = account._id.toString();
-          account.password = "";
           const tokenId = jwt.sign(
             { accountId },
             this.cfg.JWT.SECRET,
