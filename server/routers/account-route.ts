@@ -9,6 +9,12 @@ export function AccountRouter(db: DB) {
   const model = new Account(db);
   const controller = new AccountController(model, db);
   
+  router.get('/', (req, res) => { controller.list(req, res); });
+  router.get('/current', (req, res) => { controller.getCurrentAccount(req, res); });
+  router.post('/googleLogin', (req, res) => { controller.googleLogin(req, res) });
+  router.post('/fbLogin', (req, res) => { controller.facebookLogin(req, res) });
+
+  
   // grocery api
   router.get('/G/', (req, res) => { controller.gv1_list(req, res); });
   router.get('/G/:id', (req, res) => { controller.gv1_getById(req, res); });
@@ -20,16 +26,12 @@ export function AccountRouter(db: DB) {
   router.post('/wechatSignup', (req, res) => {controller.wechatSignup(req, res); });
   
   router.get('/qFind', (req, res) => { controller.list(req, res); }); // deprecated
-  router.get('/', (req, res) => { controller.list(req, res); });
-  router.get('/current', (req, res) => { controller.getCurrentAccount(req, res); });
-  router.post('/googleLogin', (req, res) => { controller.googleLogin(req, res) });
-  router.post('/fbLogin', (req, res) => { controller.fbLogin(req, res) });
   router.post('/googleSignUp', (req, res) => { controller.googleSignUp(req, res) });
   // v1
   // router.get('/attributes', (req, res) => { this.attrModel.quickFind(req, res); });
 
   // v1
-  router.get('/wechatLogin', (req, res) => { controller.wechatLogin(req, res); });
+  // router.get('/wechatLogin', (req, res) => { controller.wechatLogin(req, res); });
   // router.post('/verifyCode', (req, res) => { controller.verifyCode(req, res); }); // deprecated
 
   router.get('/:id', (req, res) => { controller.get(req, res); }); // fix me

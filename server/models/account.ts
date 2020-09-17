@@ -6,7 +6,7 @@ import { Config } from "../config";
 import { Utils } from "../utils";
 import moment from "moment";
 import { EventLog } from "./event-log";
-import { ObjectID } from "../../node_modules/@types/mongodb";
+import { ObjectId } from "mongodb";
 import { UserIdentity, IdentityType } from "../models/user-identity";
 
 const saltRounds = 10;
@@ -118,7 +118,40 @@ export class Account extends Model {
     }
   }
 
-  async initPhoneNumberLogin(username: string, phone: string, verificationCode: string){
+  // async initPhoneNumberLogin(username: string, phone: string, verificationCode: string){
+  //   const type = IdentityType.PHONE;
+  //   const identity = await this.userIdentityModel.findOne({type, phone});
+
+  //   if(!identity){
+  //     const userIdentity = {type, username, phone, verificationCode};
+  //     const r: any = await this.userIdentityModel.insertOne(userIdentity);
+  //     const identityId = r._id;
+  //     // try to find associate user by checking phone
+  //     const user = await this.findOne({phone});
+  //     if(user){
+  //       await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+  //     }else{
+  //       const profile = {name: username, phone};
+  //       return await this.createNew('guest', profile, identityId); // signup ?
+  //     }
+  //   }else{
+  //       if(identity.userId){
+  //         return identity.userId;
+  //       }else{
+  //         const profile = {name: username, phone};
+  //         return await this.createNew('guest', profile, identity._id);
+  //       }
+  //   }
+  // }
+
+  /**
+   * If user exists return user id, otherwise return null need sign up 
+   * @param username 
+   * @param phone 
+   * @param verificationCode
+   * 
+   */
+  async phoneNumberLogin(username: string, phone: string, verificationCode: string){
     const type = IdentityType.PHONE;
     const identity = await this.userIdentityModel.findOne({type, phone});
 
@@ -130,20 +163,18 @@ export class Account extends Model {
       const user = await this.findOne({phone});
       if(user){
         await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+        return user._id;
       }else{
-        const profile = {name: username, phone};
-        return await this.createNew('guest', profile, identityId);
+        return null; // need sign up
       }
     }else{
         if(identity.userId){
           return identity.userId;
         }else{
-          const profile = {name: username, phone};
-          return await this.createNew('guest', profile, identity._id);
+          return null;
         }
     }
   }
-
 
   async googleLogin(googleTokenId: string){
     const profile: any = await this.userIdentityModel.getGoogleProfile(googleTokenId);
@@ -155,7 +186,7 @@ export class Account extends Model {
       const userIdentity = {type, profileId, username: profile.name, email: profile.email}
         const r: any = await this.userIdentityModel.insertOne(userIdentity);
         const identityId = r._id;
-        // try to find associate user by checking email
+        // Bind user by email
         if(profile.email){
           const user = await this.findOne({email: profile.email});
           if(user){
@@ -175,9 +206,148 @@ export class Account extends Model {
     }
   }
 
+  async facebookLogin(fbTokenId: string, userId: string){
+    const profile: any = await this.userIdentityModel.getFacebookProfile(fbTokenId, userId);
+    const type = IdentityType.FACEBOOK;
+    const profileId = profile.id;
+    const identity = await this.userIdentityModel.findOne({type, profileId});
+    
+    profile.picture = profile.profile_pic;
+
+    if(!identity){
+      const userIdentity = {type, profileId, username: profile.name, email: profile.email}
+        const r: any = await this.userIdentityModel.insertOne(userIdentity);
+        const identityId = r._id;
+        // Bind user by email
+        if(profile.email){
+          const user = await this.findOne({email: profile.email});
+          if(user){
+            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+          }else{
+            return await this.createNew('guest', profile, identityId);
+          }
+        }else{ // no email in google, should I create a new user ?
+          return await this.createNew('guest', profile, identityId);
+        }
+    }else{
+        if(identity.userId){
+          return identity.userId;
+        }else{
+          return await this.createNew('guest', profile, identity._id);
+        }
+    }
+  }
+
+  // if openId changed ?? we will accidentally create duplicated user
+  async wechatLogin(accessToken: string, openId: string){
+    const profile = await this.userIdentityModel.getWechatProfile(accessToken, openId);
+    const type = IdentityType.WECHAT;
+    const profileId = profile.openid;
+    const identity = await this.userIdentityModel.findOne({type, profileId});
+
+    profile.name = profile.nickname;
+    profile.picture = profile.headimgurl;
+
+    if(!identity){
+      const userIdentity = {type, profileId, username: profile.nickname, email: profile.email, imageurl: profile.headimgurl, sex: profile.sex};
+        const r: any = await this.userIdentityModel.insertOne(userIdentity);
+        const identityId = r._id;
+        // Bind user by openId
+        if(profile.openid){
+          const user = await this.findOne({openId: profile.openid}); // have multiple users ??
+          if(user){
+            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+          }else{
+            return await this.createNew('guest', profile, identityId);
+          }
+        }else{ // no openid means login failed
+          return null;
+        }
+    }else{
+        if(identity.userId){
+          return identity.userId;
+        }else{
+          return await this.createNew('guest', profile, identity._id);
+        }
+    }
+  }
+
+  // return tokenId
+  async wechatLoginByOpenId(accessToken: string, openId: string) {
+    const userId = await this.wechatLogin(accessToken, openId);
+    if(userId){
+      const accountId = userId.toString();
+      const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, {expiresIn: "30d"}); // SHA256
+      return tokenId;
+    }else{
+      return null;
+    }
+  }
+
+  // code [string] --- wechat authentication code
+  // return {tokenId, accessToken, openId, expiresIn}
+  async wechatLoginByCode(code: string) {
+    if (code) {
+      const r = await this.userIdentityModel.getWechatAccessToken(code); // error code 40163
+      if (r && r.access_token && r.openid) {
+        // wechat token
+        const accessToken = r.access_token;
+        const openId = r.openid;
+        const expiresIn = r.expires_in; // 2h
+        const refreshToken = r.refresh_token;
+        const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
+        return { tokenId, accessToken, openId, expiresIn };
+      } else {
+        // const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
+        //   r & r.msg || "LoginByCode Exception"
+        // }`;
+        // console.error(message);
+        // await this.eventLogModel.addLogToDB(
+        //   DEBUG_ACCOUNT_ID,
+        //   "login by code",
+        //   "",
+        //   message
+        // );
+        return null;
+      }
+    } else {
+      // await this.eventLogModel.addLogToDB(
+      //   DEBUG_ACCOUNT_ID,
+      //   "login by code",
+      //   "",
+      //   "Empty wechat authCode"
+      // );
+      return null;
+    }
+  }
+
+  async phoneNumberSignup(name: string, phone: string, verificationCode: string){
+    const user = await this.findOne({phone});
+    if(user){
+      return {err: 'User Exists', userId: null};
+    }else{
+      const type = IdentityType.PHONE;
+      const profile = {name, phone};
+
+      const profileId = (new ObjectId()).toString();
+      const userIdentity = {type, profileId, username: name, phone };
+      const identity: any = this.userIdentityModel.insertOne(userIdentity);
+      const userId = this.createNew(type, profile, identity._id );
+      return {err: 'None', userId};
+    }
+  }
 
   private async createNew(type: string, profile: any, identityId: any) {
-    const data = { type, username: profile.name, email: profile.email, phone: profile.phone, balance: 0, imageurl: profile?.picture };
+    const data = { 
+      type,
+      username: profile.name,
+      email: profile.email,
+      phone: profile.phone,
+      balance: 0,
+      imageurl: profile?.picture,
+      sex: profile?.sex
+    };
+
     const rt = await this.insertOne(data);
     const userId = rt._id;
     await this.userIdentityModel.updateOne({ _id: identityId }, { userId });
@@ -754,6 +924,7 @@ export class Account extends Model {
     });
   }
 
+  // deprecated
   // When user login from 3rd party, eg. from wechat, it will do signup. For this senario, wechat openid is mandaroty.
   doWechatSignup(
     openId: string,
@@ -887,96 +1058,7 @@ export class Account extends Model {
     });
   }
 
-  // return tokenId
-  async wechatLoginByOpenId(accessToken: string, openId: string) {
-    try {
-      const x = await this.utils.getWechatUserInfo(accessToken, openId);
-      if (x && x.openid) {
-        const account = await this.doWechatSignup(
-          x.openid,
-          x.nickname,
-          x.headimgurl,
-          x.sex
-        );
-        if (account && account._id) {
-          const accountId = `${account._id}`;
-          const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, {
-            expiresIn: "30d",
-          }); // SHA256
-          return tokenId;
-        } else {
-          await this.eventLogModel.addLogToDB(
-            DEBUG_ACCOUNT_ID,
-            "signup by wechat",
-            "",
-            "signup by wechat fail"
-          );
-          return null;
-        }
-      } else {
-        await this.eventLogModel.addLogToDB(
-          DEBUG_ACCOUNT_ID,
-          "login by openid",
-          "",
-          "wechat get user info fail"
-        );
-        return null;
-      }
-    } catch (err) {
-      const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${
-        err || "ByOpenId Exception"
-      }`;
-      await this.eventLogModel.addLogToDB(
-        DEBUG_ACCOUNT_ID,
-        "login by openid",
-        "",
-        message
-      );
-      return null;
-    }
-  }
-
-  // code [string] --- wechat authentication code
-  // return {tokenId, accessToken, openId, expiresIn}
-  async wechatLoginByCode(code: string) {
-    if (code) {
-      try {
-        const r = await this.utils.getWechatAccessToken(code); // error code 40163
-        if (r && r.access_token && r.openid) {
-          // wechat token
-          const accessToken = r.access_token;
-          const openId = r.openid;
-          const expiresIn = r.expires_in; // 2h
-          const refreshToken = r.refresh_token;
-          const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
-          return { tokenId, accessToken, openId, expiresIn };
-        } else {
-          const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
-            r & r.msg || "LoginByCode Exception"
-          }`;
-          console.error(message);
-          await this.eventLogModel.addLogToDB(
-            DEBUG_ACCOUNT_ID,
-            "login by code",
-            "",
-            message
-          );
-          return null;
-        }
-      } catch (e) {
-        console.error(e);
-        return null;
-      }
-    } else {
-      await this.eventLogModel.addLogToDB(
-        DEBUG_ACCOUNT_ID,
-        "login by code",
-        "",
-        "Empty wechat authCode"
-      );
-      return null;
-    }
-  }
+  
 
   // cb --- function(errors)
   // validateLoginPassword( user, hashedPassword, cb ){

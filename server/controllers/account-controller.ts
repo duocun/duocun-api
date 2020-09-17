@@ -75,31 +75,31 @@ export class AccountController extends Controller {
         });
     }
 
-    wechatLogin(req: Request, res: Response) {
+    // wechatLogin(req: Request, res: Response) {
 
-        const authCode: any = req.query.code;
-        res.setHeader('Content-Type', 'application/json');
+    //     const authCode: any = req.query.code;
+    //     res.setHeader('Content-Type', 'application/json');
 
-        this.utils.getWechatAccessToken(authCode).then((r: any) => {
-            this.utils.getWechatUserInfo(r.access_token, r.openid).then((x: any) => { // IAccount
-                this.accountModel.doWechatSignup(x.openid, x.nickname, x.headimgurl, x.sex).then((account: IAccount) => {
-                    if (account) {
-                        const accountId = account._id.toString();
-                        const tokenId = this.accountModel.jwtSign(accountId);
-                        res.send(JSON.stringify(tokenId, null, 3));
-                    } else {
-                        res.send(JSON.stringify('', null, 3));
-                    }
-                });
-            }, err => {
-                console.log(err);
-                res.send(JSON.stringify('', null, 3));
-            });
-        }, err => {
-            console.log(err);
-            res.send(JSON.stringify('', null, 3));
-        });
-    }
+    //     this.utils.getWechatAccessToken(authCode).then((r: any) => {
+    //         this.utils.getWechatUserInfo(r.access_token, r.openid).then((x: any) => { // IAccount
+    //             this.accountModel.doWechatSignup(x.openid, x.nickname, x.headimgurl, x.sex).then((account: IAccount) => {
+    //                 if (account) {
+    //                     const accountId = account._id.toString();
+    //                     const tokenId = this.accountModel.jwtSign(accountId);
+    //                     res.send(JSON.stringify(tokenId, null, 3));
+    //                 } else {
+    //                     res.send(JSON.stringify('', null, 3));
+    //                 }
+    //             });
+    //         }, err => {
+    //             console.log(err);
+    //             res.send(JSON.stringify('', null, 3));
+    //         });
+    //     }, err => {
+    //         console.log(err);
+    //         res.send(JSON.stringify('', null, 3));
+    //     });
+    // }
 
 
     // return  {tokenId, accessToken, openId, expiresIn}
@@ -140,7 +140,6 @@ export class AccountController extends Controller {
 
 
     async googleLogin(req: Request, res: Response) {
-        // logger.info('----- BEGIN GOOGLE LOGIN -----')
         const token = req.body.token;
         const id = await this.model.googleLogin(token);
 
@@ -157,128 +156,146 @@ export class AccountController extends Controller {
             })
         }
     }
-    
-    async googleLogin_v1(req: Request, res: Response) {
-        // logger.info('----- BEGIN GOOGLE LOGIN -----')
-        const token = req.body.token;
-        const googleUserId = req.body.googleUserId;
-        // logger.info(`Trying to goolge login. Clamied token: ${token}, googleUserId: ${googleUserId}`);
-        // logger.info("Verifying id token");
-        const ticket = await this.googleOAuthClient.verifyIdToken({
-            idToken: token,
-            audience: this.cfg.GOOGLE_AUTH_CLIENT_ID,
-        });
-        const payload = await ticket.getPayload();
-        const userId = payload?.sub;
-        // logger.info("Verified google user id: " + userId);
-        if (googleUserId != userId) {
-            // logger.info("Google user id mismatch" + userId);
-            // logger.info("----- END GOOGLE LOGIN -----");
+
+    async facebookLogin(req: Request, res: Response) {
+        const { accessToken, userID } = req.body;
+        const id = await this.model.facebookLogin(accessToken, userID);
+
+        if(id){
+            const tokenId = this.accountModel.jwtSign(id.toString());
+            return res.json({
+                code: Code.SUCCESS,
+                token: tokenId
+            })
+        }else{
             return res.json({
                 code: Code.FAIL,
-                msg: "google_user_id_mismatch",
-            });
-        }
-        
-        let account = await this.accountModel.findOne({
-            googleUserId,
-            type: { $ne: "tmp" },
-        });
-
-        if (!account) {
-            // logger.info('No user found with such google user id')
-            account = {
-                googleUserId,
-                username:
-                    payload?.name || `user${this.accountModel.getRandomCode()}`,
-                imageurl: payload?.picture,
-                type: "client",
-                sex: 0,
-                balance: 0,
-            };
-            account = await this.accountModel.insertOne(account);
-            // logger.info(
-            //     "Created a new user, id: " +
-            //     account._id +
-            //     ", username: " +
-            //     account.username
-            // );
-        }
-        const tokenId = this.accountModel.jwtSign(account._id.toString());
-        // logger.info("Google login successful, account ID: " + account._id + " username: " + account.username);
-        // logger.info('----- END GOOGLE LOGIN -----');
-        return res.json({
-            code: Code.SUCCESS,
-            token: tokenId
-        })
-    }
-
-    async fbLogin(req: Request, res: Response) {
-        logger.info("----- BEGIN FACEBOOK LOGIN -----");
-        const { accessToken, userId } = req.body;
-        if (!accessToken || !userId) {
-            return res.json({
-                code: Code.FAIL
-            });
-        }
-        logger.info(`Access token: ${accessToken}, User ID: ${userId}`);
-
-        https
-            .get(
-                `https://graph.facebook.com/${userId}?access_token=${accessToken}&locale=en_US`,
-                (response) => {
-                    let fbResponse = '';
-                    response.on('data', (d) => {
-                        fbResponse += d;
-                    });
-                    response.on('end', async () => {
-                        const fbUser = JSON.parse(fbResponse);
-                        if (!fbUser || !fbUser.id) {
-                            logger.info("User info is not correct");
-                            logger.info(fbResponse);
-                            logger.info("-----  END FACEBOOK LOGIN  -----");
-                            return res.json({
-                                code: Code.FAIL
-                            });
-                        }
-                        let account = await this.accountModel.findOne({
-                            fbUserId: fbUser.id,
-                            type: { $ne: 'tmp' },
-                        });
-                        if (!account) {
-                            logger.info("No such user with that facebook user id");
-                            account = {
-                                fbUserId: fbUser.id,
-                                username: fbUser.name,
-                                imageurl: fbUser.profile_pic,
-                                type: "client",
-                                sex: 0,
-                                balance: 0,
-                            };
-                            account = await this.accountModel.insertOne(account);
-                            logger.info(
-                                "Created a new user, id: " +
-                                account._id +
-                                ", username: " +
-                                account.username
-                            );
-                        }
-                        const tokenId = this.accountModel.jwtSign(account._id.toString());
-                        logger.info("Facebook login successful, account ID: " + account._id + " username: " + account.username);
-                        logger.info('----- END FACEBOOK LOGIN -----');
-                        return res.json({
-                            code: Code.SUCCESS,
-                            token: tokenId
-                        });
-                    });
-                }
-            )
-            .on('error', (e) => {
-                logger.error(e);
-                logger.info("-----  END FACEBOOK LOGIN  -----");
+                token: ''
             })
-        logger.info("-----  END FACEBOOK LOGIN  -----");
+        }
     }
+
+    // async googleLogin_v1(req: Request, res: Response) {
+    //     // logger.info('----- BEGIN GOOGLE LOGIN -----')
+    //     const token = req.body.token;
+    //     const googleUserId = req.body.googleUserId;
+    //     // logger.info(`Trying to goolge login. Clamied token: ${token}, googleUserId: ${googleUserId}`);
+    //     // logger.info("Verifying id token");
+    //     const ticket = await this.googleOAuthClient.verifyIdToken({
+    //         idToken: token,
+    //         audience: this.cfg.GOOGLE_AUTH_CLIENT_ID,
+    //     });
+    //     const payload = await ticket.getPayload();
+    //     const userId = payload?.sub;
+    //     // logger.info("Verified google user id: " + userId);
+    //     if (googleUserId != userId) {
+    //         // logger.info("Google user id mismatch" + userId);
+    //         // logger.info("----- END GOOGLE LOGIN -----");
+    //         return res.json({
+    //             code: Code.FAIL,
+    //             msg: "google_user_id_mismatch",
+    //         });
+    //     }
+        
+    //     let account = await this.accountModel.findOne({
+    //         googleUserId,
+    //         type: { $ne: "tmp" },
+    //     });
+
+    //     if (!account) {
+    //         // logger.info('No user found with such google user id')
+    //         account = {
+    //             googleUserId,
+    //             username:
+    //                 payload?.name || `user${this.accountModel.getRandomCode()}`,
+    //             imageurl: payload?.picture,
+    //             type: "client",
+    //             sex: 0,
+    //             balance: 0,
+    //         };
+    //         account = await this.accountModel.insertOne(account);
+    //         // logger.info(
+    //         //     "Created a new user, id: " +
+    //         //     account._id +
+    //         //     ", username: " +
+    //         //     account.username
+    //         // );
+    //     }
+    //     const tokenId = this.accountModel.jwtSign(account._id.toString());
+    //     // logger.info("Google login successful, account ID: " + account._id + " username: " + account.username);
+    //     // logger.info('----- END GOOGLE LOGIN -----');
+    //     return res.json({
+    //         code: Code.SUCCESS,
+    //         token: tokenId
+    //     })
+    // }
+
+    // async fbLogin(req: Request, res: Response) {
+    //     logger.info("----- BEGIN FACEBOOK LOGIN -----");
+    //     const { accessToken, userId } = req.body;
+    //     if (!accessToken || !userId) {
+    //         return res.json({
+    //             code: Code.FAIL
+    //         });
+    //     }
+    //     logger.info(`Access token: ${accessToken}, User ID: ${userId}`);
+
+    //     https
+    //         .get(
+    //             `https://graph.facebook.com/${userId}?access_token=${accessToken}&locale=en_US`,
+    //             (response) => {
+    //                 let fbResponse = '';
+    //                 response.on('data', (d) => {
+    //                     fbResponse += d;
+    //                 });
+    //                 response.on('end', async () => {
+    //                     const fbUser = JSON.parse(fbResponse);
+    //                     if (!fbUser || !fbUser.id) {
+    //                         logger.info("User info is not correct");
+    //                         logger.info(fbResponse);
+    //                         logger.info("-----  END FACEBOOK LOGIN  -----");
+    //                         return res.json({
+    //                             code: Code.FAIL
+    //                         });
+    //                     }
+    //                     let account = await this.accountModel.findOne({
+    //                         fbUserId: fbUser.id,
+    //                         type: { $ne: 'tmp' },
+    //                     });
+    //                     if (!account) {
+    //                         logger.info("No such user with that facebook user id");
+    //                         account = {
+    //                             fbUserId: fbUser.id,
+    //                             username: fbUser.name,
+    //                             imageurl: fbUser.profile_pic,
+    //                             type: "client",
+    //                             sex: 0,
+    //                             balance: 0,
+    //                         };
+    //                         account = await this.accountModel.insertOne(account);
+    //                         logger.info(
+    //                             "Created a new user, id: " +
+    //                             account._id +
+    //                             ", username: " +
+    //                             account.username
+    //                         );
+    //                     }
+    //                     const tokenId = this.accountModel.jwtSign(account._id.toString());
+    //                     logger.info("Facebook login successful, account ID: " + account._id + " username: " + account.username);
+    //                     logger.info('----- END FACEBOOK LOGIN -----');
+    //                     return res.json({
+    //                         code: Code.SUCCESS,
+    //                         token: tokenId
+    //                     });
+    //                 });
+    //             }
+    //         )
+    //         .on('error', (e) => {
+    //             logger.error(e);
+    //             logger.info("-----  END FACEBOOK LOGIN  -----");
+    //         })
+    //     logger.info("-----  END FACEBOOK LOGIN  -----");
+    // }
 
     async googleSignUp(req: Request, res: Response) {
         logger.info('--- BEGIN GOOGLE REGISTER ---')
