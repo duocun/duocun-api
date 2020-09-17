@@ -146,22 +146,24 @@ export class Entity {
     return dt.split('.')[0];
   }
 
-  insertOne(doc: any): Promise<any> {
-    const self = this;
-    return new Promise((resolve, reject) => {
-      self.getCollection().then((c: Collection) => {
-        doc = this.convertIdFields(doc);
-        doc.created = moment().toISOString();
-        doc.modified = moment().toISOString();
+  async insertOne(doc: any): Promise<any> {
+    const c = await this.getCollection();
+    doc = this.convertIdFields(doc);
+    doc.created = moment().toISOString();
+    doc.modified = moment().toISOString();
 
-        c.insertOne(doc).then((result: any) => { // InsertOneWriteOpResult
-          const ret = (result.ops && result.ops.length > 0) ? result.ops[0] : null;
-          resolve(ret);
-        });
-      });
-    });
+    const result = await c.insertOne(doc);
+    const ret = (result.ops && result.ops.length > 0) ? result.ops[0] : null;
+    return ret;
   }
 
+  async deleteOne(query: any) {
+    const c = await this.getCollection();
+    const q = this.convertIdFields(query);
+    const r = await c.deleteOne(q);
+    return r;
+  }
+  
   distinct(key: string, query: any, options?: any): Promise<any> {
     const self = this;
     return new Promise((resolve, reject) => {
@@ -521,7 +523,7 @@ export class Entity {
       a.push({ updateOne: { filter: query, update: { $set: doc }, upsert: true } });
     });
 
-    if(a && a.length > 0){
+    if (a && a.length > 0) {
       await c.bulkWrite(a, options);
     }
     return { status: DbStatus.SUCCESS, msg: '' };
@@ -573,6 +575,8 @@ export class Entity {
       });
     });
   }
+
+
 
   deleteById(id: string): Promise<any> {
     return new Promise((resolve, reject) => {

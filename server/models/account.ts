@@ -7,6 +7,7 @@ import { Utils } from "../utils";
 import moment from "moment";
 import { EventLog } from "./event-log";
 import { ObjectID } from "../../node_modules/@types/mongodb";
+import { UserIdentity, IdentityType } from "../models/user-identity";
 
 const saltRounds = 10;
 
@@ -83,6 +84,7 @@ export class Account extends Model {
   twilioClient: any;
   eventLogModel: EventLog;
   utils: Utils;
+  userIdentityModel: UserIdentity;
 
   constructor(dbo: DB) {
     super(dbo, "users");
@@ -93,6 +95,93 @@ export class Account extends Model {
       this.cfg.TWILIO.TOKEN
     );
     this.utils = new Utils();
+    this.userIdentityModel = new UserIdentity(dbo);
+  }
+
+  async bindPhoneNumber(phone: string, type: string, googleTokenId: string){
+    const profile: any = this.userIdentityModel.getGoogleProfile(googleTokenId);
+    const profileId = profile.sub;
+    const identity = await this.userIdentityModel.findOne({type, profileId});
+    const user = await this.findOne({phone});
+
+    if(user){
+      const userToRemove = await this.findOne({_id: identity.userId, type: 'guest'});
+      if(userToRemove && user._id.toString() !== userToRemove._id.toString()){
+        await this.deleteOne({_id: userToRemove._id});
+      }
+      await this.userIdentityModel.updateOne({_id: identity._id}, {userId: user._id});
+
+      return user._id;
+    }else{
+      await this.updateOne({_id: identity.userId}, {phone, type: 'client'});
+      return identity.userId;
+    }
+  }
+
+  async initPhoneNumberLogin(username: string, phone: string, verificationCode: string){
+    const type = IdentityType.PHONE;
+    const identity = await this.userIdentityModel.findOne({type, phone});
+
+    if(!identity){
+      const userIdentity = {type, username, phone, verificationCode};
+      const r: any = await this.userIdentityModel.insertOne(userIdentity);
+      const identityId = r._id;
+      // try to find associate user by checking phone
+      const user = await this.findOne({phone});
+      if(user){
+        await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+      }else{
+        const profile = {name: username, phone};
+        return await this.createNew('guest', profile, identityId);
+      }
+    }else{
+        if(identity.userId){
+          return identity.userId;
+        }else{
+          const profile = {name: username, phone};
+          return await this.createNew('guest', profile, identity._id);
+        }
+    }
+  }
+
+
+  async googleLogin(googleTokenId: string){
+    const profile: any = await this.userIdentityModel.getGoogleProfile(googleTokenId);
+    const type = IdentityType.GOOGLE;
+    const profileId = profile.sub;
+    const identity = await this.userIdentityModel.findOne({type, profileId});
+
+    if(!identity){
+      const userIdentity = {type, profileId, username: profile.name, email: profile.email}
+        const r: any = await this.userIdentityModel.insertOne(userIdentity);
+        const identityId = r._id;
+        // try to find associate user by checking email
+        if(profile.email){
+          const user = await this.findOne({email: profile.email});
+          if(user){
+            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+          }else{
+            return await this.createNew('guest', profile, identityId);
+          }
+        }else{ // no email in google, should I create a new user ?
+          return await this.createNew('guest', profile, identityId);
+        }
+    }else{
+        if(identity.userId){
+          return identity.userId;
+        }else{
+          return await this.createNew('guest', profile, identity._id);
+        }
+    }
+  }
+
+
+  private async createNew(type: string, profile: any, identityId: any) {
+    const data = { type, username: profile.name, email: profile.email, phone: profile.phone, balance: 0, imageurl: profile?.picture };
+    const rt = await this.insertOne(data);
+    const userId = rt._id;
+    await this.userIdentityModel.updateOne({ _id: identityId }, { userId });
+    return userId;
   }
 
   jwtSign(accountId: string) {

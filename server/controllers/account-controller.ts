@@ -14,6 +14,7 @@ import { DB } from "../db";
 import { Controller } from "./controller";
 
 export class AccountController extends Controller {
+    model: Account;
     accountModel: Account;
     attrModel: AccountAttribute;
     merchantStuff: MerchantStuff;
@@ -23,6 +24,7 @@ export class AccountController extends Controller {
 
     constructor(model: any, db: DB) {
         super(model, db);
+        this.model = model;
         this.accountModel = model;
         this.attrModel = new AccountAttribute(db);
         this.merchantStuff = new MerchantStuff(db);
@@ -138,32 +140,53 @@ export class AccountController extends Controller {
 
 
     async googleLogin(req: Request, res: Response) {
-        logger.info('----- BEGIN GOOGLE LOGIN -----')
+        // logger.info('----- BEGIN GOOGLE LOGIN -----')
+        const token = req.body.token;
+        const id = await this.model.googleLogin(token);
+
+        if(id){
+            const tokenId = this.accountModel.jwtSign(id.toString());
+            return res.json({
+                code: Code.SUCCESS,
+                token: tokenId
+            })
+        }else{
+            return res.json({
+                code: Code.FAIL,
+                token: ''
+            })
+        }
+    }
+    
+    async googleLogin_v1(req: Request, res: Response) {
+        // logger.info('----- BEGIN GOOGLE LOGIN -----')
         const token = req.body.token;
         const googleUserId = req.body.googleUserId;
-        logger.info(`Trying to goolge login. Clamied token: ${token}, googleUserId: ${googleUserId}`);
-        logger.info("Verifying id token");
+        // logger.info(`Trying to goolge login. Clamied token: ${token}, googleUserId: ${googleUserId}`);
+        // logger.info("Verifying id token");
         const ticket = await this.googleOAuthClient.verifyIdToken({
             idToken: token,
             audience: this.cfg.GOOGLE_AUTH_CLIENT_ID,
         });
         const payload = await ticket.getPayload();
         const userId = payload?.sub;
-        logger.info("Verified google user id: " + userId);
+        // logger.info("Verified google user id: " + userId);
         if (googleUserId != userId) {
-            logger.info("Google user id mismatch" + userId);
-            logger.info("----- END GOOGLE LOGIN -----");
+            // logger.info("Google user id mismatch" + userId);
+            // logger.info("----- END GOOGLE LOGIN -----");
             return res.json({
                 code: Code.FAIL,
                 msg: "google_user_id_mismatch",
             });
         }
+        
         let account = await this.accountModel.findOne({
             googleUserId,
             type: { $ne: "tmp" },
         });
+
         if (!account) {
-            logger.info('No user found with such google user id')
+            // logger.info('No user found with such google user id')
             account = {
                 googleUserId,
                 username:
@@ -174,16 +197,16 @@ export class AccountController extends Controller {
                 balance: 0,
             };
             account = await this.accountModel.insertOne(account);
-            logger.info(
-                "Created a new user, id: " +
-                account._id +
-                ", username: " +
-                account.username
-            );
+            // logger.info(
+            //     "Created a new user, id: " +
+            //     account._id +
+            //     ", username: " +
+            //     account.username
+            // );
         }
         const tokenId = this.accountModel.jwtSign(account._id.toString());
-        logger.info("Google login successful, account ID: " + account._id + " username: " + account.username);
-        logger.info('----- END GOOGLE LOGIN -----');
+        // logger.info("Google login successful, account ID: " + account._id + " username: " + account.username);
+        // logger.info('----- END GOOGLE LOGIN -----');
         return res.json({
             code: Code.SUCCESS,
             token: tokenId
