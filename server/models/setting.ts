@@ -3,14 +3,14 @@ import { ObjectId } from "mongodb";
 import { EventLog } from "./event-log";
 import { DB } from "../db";
 
-export enum PAYMENT_METHOD {
+export enum PAYMENT_GATEWAY_VENDOR {
   ALPHAPAY = "alphapay",
   SNAPPAY = "snappay",
 }
 
 export type SettingType = {
   _id: string | ObjectId;
-  payment_method: PAYMENT_METHOD;
+  payment_method: PAYMENT_GATEWAY_VENDOR;
 };
 
 export class Setting extends Model {
@@ -32,5 +32,5 @@ export class Setting extends Model {
 }
 
 export const DEFAULT_MODEL = {
-  payment_method: PAYMENT_METHOD.SNAPPAY
+  payment_method: PAYMENT_GATEWAY_VENDOR.SNAPPAY
 };
