@@ -1,5 +1,5 @@
 import { DB } from "../db";
-import { Model } from "./model";
+import { Model, Code } from "./model";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { Config } from "../config";
@@ -33,6 +33,13 @@ export enum Role {
   MANAGER = 4,
   DRIVER = 5,
   CLIENT = 6,
+}
+export interface IProfile {
+  username: string,
+  // email: string,
+  phone: string,
+  location: any,
+  secondPhone?: string
 }
 
 export interface IAccountAttribute {
@@ -84,6 +91,7 @@ export class Account extends Model {
   twilioClient: any;
   eventLogModel: EventLog;
   utils: Utils;
+
   userIdentityModel: UserIdentity;
 
   constructor(dbo: DB) {
@@ -98,22 +106,22 @@ export class Account extends Model {
     this.userIdentityModel = new UserIdentity(dbo);
   }
 
-  async bindPhoneNumber(phone: string, type: string, googleTokenId: string){
+  async bindPhoneNumberOld(phone: string, type: string, googleTokenId: string) {
     const profile: any = this.userIdentityModel.getGoogleProfile(googleTokenId);
     const profileId = profile.sub;
-    const identity = await this.userIdentityModel.findOne({type, profileId});
-    const user = await this.findOne({phone});
+    const identity = await this.userIdentityModel.findOne({ type, profileId });
+    const user = await this.findOne({ phone });
 
-    if(user){
-      const userToRemove = await this.findOne({_id: identity.userId, type: 'guest'});
-      if(userToRemove && user._id.toString() !== userToRemove._id.toString()){
-        await this.deleteOne({_id: userToRemove._id});
+    if (user) {
+      const userToRemove = await this.findOne({ _id: identity.userId, type: 'guest' });
+      if (userToRemove && user._id.toString() !== userToRemove._id.toString()) {
+        await this.deleteOne({ _id: userToRemove._id });
       }
-      await this.userIdentityModel.updateOne({_id: identity._id}, {userId: user._id});
+      await this.userIdentityModel.updateOne({ _id: identity._id }, { userId: user._id });
 
       return user._id;
-    }else{
-      await this.updateOne({_id: identity.userId}, {phone, type: 'client'});
+    } else {
+      await this.updateOne({ _id: identity.userId }, { phone, type: 'client' });
       return identity.userId;
     }
   }
@@ -151,135 +159,136 @@ export class Account extends Model {
    * @param verificationCode
    * 
    */
-  async phoneNumberLogin(username: string, phone: string, verificationCode: string){
+  async phoneNumberLogin(username: string, phone: string, verificationCode: string) {
     const type = IdentityType.PHONE;
-    const identity = await this.userIdentityModel.findOne({type, phone});
+    const identity = await this.userIdentityModel.findOne({ type, phone });
 
-    if(!identity){
-      const userIdentity = {type, username, phone, verificationCode};
+    if (!identity) {
+      const userIdentity = { type, username, phone, verificationCode };
       const r: any = await this.userIdentityModel.insertOne(userIdentity);
       const identityId = r._id;
       // try to find associate user by checking phone
-      const user = await this.findOne({phone});
-      if(user){
-        await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
+      const user = await this.findOne({ phone });
+      if (user) {
+        await this.userIdentityModel.updateOne({ _id: identityId }, { userId: user._id });
         return user._id;
-      }else{
+      } else {
         return null; // need sign up
       }
-    }else{
-        if(identity.userId){
-          return identity.userId;
-        }else{
-          return null;
-        }
+    } else {
+      if (identity.userId) {
+        return identity.userId;
+      } else {
+        return null;
+      }
     }
   }
 
-  async googleLogin(googleTokenId: string){
+  async googleLogin(googleTokenId: string) {
     const profile: any = await this.userIdentityModel.getGoogleProfile(googleTokenId);
     const type = IdentityType.GOOGLE;
     const profileId = profile.sub;
-    const identity = await this.userIdentityModel.findOne({type, profileId});
+    const identity = await this.userIdentityModel.findOne({ type, profileId });
 
-    if(!identity){
-      const userIdentity = {type, profileId, username: profile.name, email: profile.email}
-        const r: any = await this.userIdentityModel.insertOne(userIdentity);
-        const identityId = r._id;
-        // Bind user by email
-        if(profile.email){
-          const user = await this.findOne({email: profile.email});
-          if(user){
-            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
-          }else{
-            return await this.createNew('guest', profile, identityId);
-          }
-        }else{ // no email in google, should I create a new user ?
+    if (!identity) {
+      const userIdentity = { type, profileId, username: profile.name, email: profile.email }
+      const r: any = await this.userIdentityModel.insertOne(userIdentity);
+      const identityId = r._id;
+      // Bind user by email
+      if (profile.email) {
+        const user = await this.findOne({ email: profile.email });
+        if (user) {
+          await this.userIdentityModel.updateOne({ _id: identityId }, { userId: user._id });
+        } else {
           return await this.createNew('guest', profile, identityId);
         }
-    }else{
-        if(identity.userId){
-          return identity.userId;
-        }else{
-          return await this.createNew('guest', profile, identity._id);
-        }
+      } else { // no email in google, should I create a new user ?
+        return await this.createNew('guest', profile, identityId);
+      }
+    } else {
+      if (identity.userId) {
+        return identity.userId;
+      } else {
+        return await this.createNew('guest', profile, identity._id);
+      }
     }
   }
 
-  async facebookLogin(fbTokenId: string, userId: string){
+  async facebookLogin(fbTokenId: string, userId: string) {
     const profile: any = await this.userIdentityModel.getFacebookProfile(fbTokenId, userId);
     const type = IdentityType.FACEBOOK;
     const profileId = profile.id;
-    const identity = await this.userIdentityModel.findOne({type, profileId});
-    
+    const identity = await this.userIdentityModel.findOne({ type, profileId });
+
     profile.picture = profile.profile_pic;
 
-    if(!identity){
-      const userIdentity = {type, profileId, username: profile.name, email: profile.email}
-        const r: any = await this.userIdentityModel.insertOne(userIdentity);
-        const identityId = r._id;
-        // Bind user by email
-        if(profile.email){
-          const user = await this.findOne({email: profile.email});
-          if(user){
-            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
-          }else{
-            return await this.createNew('guest', profile, identityId);
-          }
-        }else{ // no email in google, should I create a new user ?
+    if (!identity) {
+      const userIdentity = { type, profileId, username: profile.name, email: profile.email }
+      const r: any = await this.userIdentityModel.insertOne(userIdentity);
+      const identityId = r._id;
+      // Bind user by email
+      if (profile.email) {
+        const user = await this.findOne({ email: profile.email });
+        if (user) {
+          await this.userIdentityModel.updateOne({ _id: identityId }, { userId: user._id });
+        } else {
           return await this.createNew('guest', profile, identityId);
         }
-    }else{
-        if(identity.userId){
-          return identity.userId;
-        }else{
-          return await this.createNew('guest', profile, identity._id);
-        }
+      } else { // no email in google, should I create a new user ?
+        return await this.createNew('guest', profile, identityId);
+      }
+    } else {
+      if (identity.userId) {
+        return identity.userId;
+      } else {
+        return await this.createNew('guest', profile, identity._id);
+      }
     }
   }
 
   // if openId changed ?? we will accidentally create duplicated user
-  async wechatLogin(accessToken: string, openId: string){
+  async wechatLogin(accessToken: string, openId: string) {
     const profile = await this.userIdentityModel.getWechatProfile(accessToken, openId);
     const type = IdentityType.WECHAT;
     const profileId = profile.openid;
-    const identity = await this.userIdentityModel.findOne({type, profileId});
+    const identity = await this.userIdentityModel.findOne({ type, profileId });
 
     profile.name = profile.nickname;
     profile.picture = profile.headimgurl;
 
-    if(!identity){
-      const userIdentity = {type, profileId, username: profile.nickname, email: profile.email, imageurl: profile.headimgurl, sex: profile.sex};
-        const r: any = await this.userIdentityModel.insertOne(userIdentity);
-        const identityId = r._id;
-        // Bind user by openId
-        if(profile.openid){
-          const user = await this.findOne({openId: profile.openid}); // have multiple users ??
-          if(user){
-            await this.userIdentityModel.updateOne({_id: identityId}, {userId: user._id});
-          }else{
-            return await this.createNew('guest', profile, identityId);
-          }
-        }else{ // no openid means login failed
-          return null;
+    if (!identity) {
+      const userIdentity = { type, profileId, username: profile.nickname, email: profile.email, imageurl: profile.headimgurl, sex: profile.sex };
+      const r: any = await this.userIdentityModel.insertOne(userIdentity);
+      const identityId = r._id;
+      // Bind user by openId
+      if (profile.openid) {
+        const user = await this.findOne({ openId: profile.openid }); // have multiple users ??
+        if (user) {
+          await this.userIdentityModel.updateOne({ _id: identityId }, { userId: user._id });
+        } else {
+          // sign up
+          return await this.createNew('guest', profile, identityId);
         }
-    }else{
-        if(identity.userId){
-          return identity.userId;
-        }else{
-          return await this.createNew('guest', profile, identity._id);
-        }
+      } else { // no openid means login failed
+        return null;
+      }
+    } else {
+      if (identity.userId) {
+        return identity.userId;
+      } else {
+        return await this.createNew('guest', profile, identity._id);
+      }
     }
   }
 
   // return tokenId
   async wechatLoginByOpenId(accessToken: string, openId: string) {
     const userId = await this.wechatLogin(accessToken, openId);
-    if(userId){
+    if (userId) {
       const accountId = userId.toString();
-      const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, {expiresIn: "30d"}); // SHA256
+      const tokenId = jwt.sign({ accountId }, this.cfg.JWT.SECRET, { expiresIn: "30d" }); // SHA256
       return tokenId;
-    }else{
+    } else {
       return null;
     }
   }
@@ -294,7 +303,7 @@ export class Account extends Model {
         const accessToken = r.access_token;
         const openId = r.openid;
         const expiresIn = r.expires_in; // 2h
-        const refreshToken = r.refresh_token;
+        // const refreshToken = r.refresh_token;
         const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
         return { tokenId, accessToken, openId, expiresIn };
       } else {
@@ -321,24 +330,293 @@ export class Account extends Model {
     }
   }
 
-  async phoneNumberSignup(name: string, phone: string, verificationCode: string){
-    const user = await this.findOne({phone});
-    if(user){
-      return {err: 'User Exists', userId: null};
-    }else{
+  async phoneNumberSignup(name: string, phone: string, verificationCode: string) {
+    const user = await this.findOne({ phone });
+    if (user) {
+      return { err: 'User Exists', userId: null };
+    } else {
       const type = IdentityType.PHONE;
-      const profile = {name, phone};
+      const profile = { name, phone };
 
       const profileId = (new ObjectId()).toString();
-      const userIdentity = {type, profileId, username: name, phone };
+      const userIdentity = { type, profileId, username: name, phone };
       const identity: any = this.userIdentityModel.insertOne(userIdentity);
-      const userId = this.createNew(type, profile, identity._id );
-      return {err: 'None', userId};
+      const userId = this.createNew(type, profile, identity._id);
+      return { err: 'None', userId };
     }
   }
 
+  isProfileValid(profile: IProfile) {
+    return profile.phone && profile.location;
+  }
+
+  async bindPhoneNumber(phone: string, userId: string) {
+    // const profile: any = this.userIdentityModel.getGoogleProfile(googleTokenId);
+    // const profileId = profile.sub;
+    const identity = await this.userIdentityModel.findOne({ userId });
+    const user = await this.findOne({ phone });
+
+    if (user) {
+      if(user._id.toString() !== userId){
+        const userToRemove = await this.findOne({ _id: identity.userId, type: 'guest' });
+        if (userToRemove && user._id.toString() !== userToRemove._id.toString()) {
+          await this.deleteOne({ _id: userToRemove._id });
+        }
+        await this.userIdentityModel.updateOne({ _id: identity._id }, { userId: user._id });
+      }
+      return user._id;
+    } else {
+      await this.updateOne({ _id: identity.userId }, { phone, type: 'client' });
+      return identity.userId;
+    }
+  }
+
+  async verifyPhone(phone: string, verificationCode: string){
+    const user = await this.findOne({phone});
+    return user && user.verificationCode === verificationCode;
+  }
+  // "Accounts/saveProfile" return
+  //     username: this.model.username,
+  //     newPhone: this.model.phone,
+  //     code: this.model.verificationCode,
+  //     location: this.saveLocation ? this.location : null,
+  //     secondPhone: this.model.secondPhone
+  // profile --- username: string, phone: string, location: any, secondPhone?: any
+  async saveProfile(accountId: string, profile: IProfile) {
+
+    let account = await this.findOne({ _id: accountId });
+    if (!account) {
+      return {
+        err: "no such account"
+      };
+    } else {
+      if (this.isProfileValid(profile)) {
+        const userId = await this.bindPhoneNumber(profile.phone, accountId); 
+        await this.updateOne({ _id: account._id }, profile);
+        return {
+          err: "none"
+        };
+      } else {
+        return {
+          err: "invalid profile"
+        };
+      }
+    }
+    // logger.info("--- BEGIN ACCOUNT PROFILE CHANGE ---");
+    // logger.info(`Account ID: ${account._id}, username: ${account.username}`);
+    // let { location, secondPhone, newPhone, code, username } = req.body;
+    // logger.info(`newPhone: ${newPhone}, oldPhone: ${account.phone}`)
+    // if (newPhone !== account.phone) {
+    //     // logger.info("trying to change phone number");
+    //     if (account.newPhone === newPhone && account.verificationCode === code) {
+    //         // find existing account with new phone
+    //         logger.info("verification code matches");
+    //         const existingAccount = await this.accountModel.findOne({ phone: newPhone });
+    //         if (existingAccount && existingAccount._id.toString() !== account._id.toString()) {
+    //             logger.info(`Account with same phone number exists. Account ID: ${existingAccount._id}, username: ${existingAccount.username}`);
+    //             logger.info("merge two accounts");
+    //             existingAccount.imageurl = existingAccount.imageurl || account.imageurl;
+    //             existingAccount.realm = existingAccount.realm || account.realm;
+    //             existingAccount.openId = existingAccount.openId || account.openId;
+    //             existingAccount.unionId = existingAccount.unionId || account.unionId;
+    //             existingAccount.visited = existingAccount.visited || account.visited;
+    //             existingAccount.balance = (existingAccount.balance || 0) + (account.balance || 0);
+    //             existingAccount.sex = existingAccount.sex === undefined ? account.sex : existingAccount.sex;
+    //             existingAccount.attributes = existingAccount.attributes || account.attributes;
+    //             if (existingAccount.type && existingAccount.type != 'client' && existingAccount.type != 'user') {
+
+    //             } else {
+    //                 existingAccount.type = existingAccount.type || account.type;
+    //             }
+    //             if (account.type && account.type != 'client' && account.type != 'user' && account.type != 'tmp') {
+    //                 existingAccount.type = account.type;
+    //             }
+    //             logger.info("Disabling new account: " + accountId);
+    //             account.openId = account.openId + "_disabled";
+    //             account.unionId = account.unionId + "_disabled";
+    //             account.phone = account.phone + "_disabled";
+    //             account.type = "tmp";
+    //             await this.accountModel.updateOne({ _id: account._id }, account);
+    //             account = existingAccount;
+    //         }
+    //         account.phone = newPhone;
+    //         account.newPhone = "";
+    //         account.verificationCode = this.accountModel.getRandomCode();
+    //         account.verified = true;
+    //     } else {
+    //         logger.info("verification code mismatch");
+    //         logger.info(`Verification code is ${account.verificationCode}, but received ${code}`);
+    //         logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+    //         return res.json({
+    //             code: Code.FAIL,
+    //             message: "verification code mismatch"
+    //         });
+    //     }
+    // }
+    // account.username = username;
+    // account.location = location;
+    // if (!location) {
+    //     account.location = null;
+    // }
+    // if (secondPhone) {
+    //     secondPhone = secondPhone.substring(0, 2) === "+1" ? secondPhone.substring(2) : secondPhone;
+    //     account.secondPhone = secondPhone;
+    // }
+    // try {
+    //     logger.info("Saving account");
+    //     await this.accountModel.updateOne({ _id: account._id }, account);
+    //     logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+    //     return res.send(JSON.stringify({
+    //         code: Code.SUCCESS,
+    //         data: jwt.sign({ accountId: account._id.toString() }, this.cfg.JWT.SECRET, {
+    //             expiresIn: '30d'
+    //         })
+    //     }));
+    // } catch (e) {
+    //     logger.error("Save failed, " + e);
+    //     logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+    //     return res.send(JSON.stringify({
+    //         code: Code.FAIL,
+    //         message: "save failed"
+    //     }));
+    // }
+  }
+
+
+  async sendVerificationCodeAfterLogin(accountId: string, phoneNumber: string) {
+    const phone = phoneNumber.substring(0, 2) === "+1" ? phoneNumber.substring(2) : phoneNumber;
+    const account = await this.findOne({ phone }); // fix me, is it possible multiple
+
+    if(account){
+      if(account._id.toString() !== accountId){ // need merge account
+        return {
+          code: Code.FAIL,
+          message: 'Another account with same phone number found'
+        }
+      }else{ // no need merge account
+        const verificationCode = this.getRandomCode();
+        await this.sendMessage(phone, verificationCode);
+        await this.updateOne({ _id: accountId }, {verificationCode});
+        return {
+          code: Code.SUCCESS
+        }
+      }
+    }else{ // use existing account
+      const verificationCode = this.getRandomCode();
+      await this.sendMessage(phone, verificationCode);
+      await this.updateOne({ _id: accountId }, {phone, verificationCode});
+      return {
+        code: Code.SUCCESS
+      }
+    }
+  }
+
+
+  // async verifyPhoneNumber(phone: string, code: string, loggedInAccountId: string) {
+  //     const cfg = new Config();
+
+  //     const account = await this.findOne({ phone });
+  //     if (account && account.password) {
+  //       delete account.password;
+  //     }
+
+  //       if (loggedInAccountId) {
+  //         if (account) {
+  //           // phone has account
+  //           if (account._id.toString() !== loggedInAccountId) {
+  //             resolve({
+  //               verified: false,
+  //               err: VerificationError.PHONE_NUMBER_OCCUPIED,
+  //               account,
+  //             });
+  //           } else {
+  //             if (
+  //               account.verificationCode &&
+  //               code === account.verificationCode
+  //             ) {
+  //               const tokenId = jwt.sign(
+  //                 { accountId: account._id.toString() },
+  //                 cfg.JWT.SECRET,
+  //                 {
+  //                   expiresIn: "30d",
+  //                 }
+  //               ); // SHA256
+  //               resolve({
+  //                 verified: true,
+  //                 err: VerificationError.NONE,
+  //                 account,
+  //                 tokenId,
+  //               });
+  //             } else {
+  //               resolve({
+  //                 verified: false,
+  //                 err: VerificationError.WRONG_CODE,
+  //                 account,
+  //               });
+  //             }
+  //           }
+  //         } else {
+  //           const tokenId = jwt.sign(
+  //             { accountId: loggedInAccountId },
+  //             cfg.JWT.SECRET,
+  //             {
+  //               expiresIn: "30d",
+  //             }
+  //           ); // SHA256
+  //           resolve({
+  //             verified: true,
+  //             err: VerificationError.NONE,
+  //             account,
+  //             tokenId,
+  //           }); // please resend code
+  //         }
+  //       } else {
+  //         // enter from web page
+  //         if (account) {
+  //           if (account.openId) {
+  //             resolve({
+  //               verified: false,
+  //               err: VerificationError.PHONE_NUMBER_OCCUPIED,
+  //               account,
+  //             });
+  //           } else {
+  //             if (
+  //               account.verificationCode &&
+  //               code === account.verificationCode
+  //             ) {
+  //               const tokenId = jwt.sign(
+  //                 { accountId: account._id.toString() },
+  //                 cfg.JWT.SECRET,
+  //                 {
+  //                   expiresIn: "30d",
+  //                 }
+  //               ); // SHA256
+  //               resolve({
+  //                 verified: true,
+  //                 err: VerificationError.NONE,
+  //                 account,
+  //                 tokenId,
+  //               }); // tokenId: tokenId,
+  //             } else {
+  //               resolve({
+  //                 verified: false,
+  //                 err: VerificationError.WRONG_CODE,
+  //                 account,
+  //               });
+  //             }
+  //           }
+  //         } else {
+  //           resolve({
+  //             verified: false,
+  //             err: VerificationError.NO_PHONE_NUMBER_BIND,
+  //             account,
+  //           }); // // please resend code
+  //         }
+  //       }
+  // }
+
   private async createNew(type: string, profile: any, identityId: any) {
-    const data = { 
+    const data = {
       type,
       username: profile.name,
       email: profile.email,
@@ -854,7 +1132,7 @@ export class Account extends Model {
       } catch (e) {
         const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${
           e || " Exception"
-        }`;
+          }`;
         await this.eventLogModel.addLogToDB(
           DEBUG_ACCOUNT_ID,
           "jwt",
@@ -877,7 +1155,7 @@ export class Account extends Model {
   }
 
   createTmpAccount(phone: string, verificationCode: string): Promise<IAccount> {
-    return new Promise((resolve, reject) => {});
+    return new Promise((resolve, reject) => { });
   }
 
   // There are two senarios for signup.
@@ -934,7 +1212,7 @@ export class Account extends Model {
   ): Promise<IAccount> {
     return new Promise((resolve, reject) => {
       if (openId) {
-        this.findOne({ openId: openId, type: { $ne: "tmp" },  }).then((x: IAccount) => {
+        this.findOne({ openId: openId, type: { $ne: "tmp" }, }).then((x: IAccount) => {
           if (x) {
             const updates = {
               username: username,
@@ -1058,7 +1336,7 @@ export class Account extends Model {
     });
   }
 
-  
+
 
   // cb --- function(errors)
   // validateLoginPassword( user, hashedPassword, cb ){

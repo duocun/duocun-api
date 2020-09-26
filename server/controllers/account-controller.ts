@@ -525,6 +525,11 @@ export class AccountController extends Controller {
         });
     }
 
+    /**
+     * Use for login
+     * @param req 
+     * @param res 
+     */
     async sendOTPCode(req: Request, res: Response) {
         let phone = req.body.phone;
         const account = await this.accountModel.findOne({ phone });
@@ -550,58 +555,55 @@ export class AccountController extends Controller {
         });
     }
 
-    async gv1_sendVerificationCode(req: Request, res: Response) {
-        res.setHeader('Content-Type', 'application/json');
-        let token: string = req.get('Authorization') || "";
-        token = token.replace("Bearer ", "");
-        const cfg = new Config();
-        let accountId = "";
-        try {
-            const jwtPayload: any = jwt.verify(token, cfg.JWT.SECRET);
-            accountId = jwtPayload.accountId;
-        } catch (e) {
-            console.error(e);
+    /**
+     *  For update profile
+     * @param req 
+     * @param res 
+     */
+    async sendVerificationCodeAfterLogin(req: Request, res: Response) {
+        const phone = req.body.phone;
+        
+        if (!phone) {
+            return res.send({
+                code: Code.FAIL,
+                message: "phone number missing"
+            });
+        }
+
+        const userId = this.getUserId(req);
+        
+        if(userId){
+            const r = await this.model.sendVerificationCodeAfterLogin(userId, phone);
+            return res.send(r);
+        }else{
             return res.send(JSON.stringify({
                 code: Code.FAIL,
                 message: "authentication failed"
             }));
         }
-        let newPhone = req.body.phone;
-        if (!newPhone) {
-            return res.send(JSON.stringify({
-                code: Code.FAIL,
-                message: "phone number missing"
-            }));
-        }
-        const account = await this.accountModel.findOne({ _id: new ObjectId(accountId) });
-        if (!account) {
-            return res.send(JSON.stringify({
-                code: Code.FAIL,
-                message: "no such account"
-            }));
-        }
-        newPhone = newPhone.substring(0, 2) === "+1" ? newPhone.substring(2) : newPhone;
-        account.newPhone = newPhone;
-        const code = this.accountModel.getRandomCode();
-        account.verificationCode = code;
-        try {
-            await this.accountModel.sendMessage(account.newPhone, account.verificationCode);
-            await this.accountModel.updateOne({ _id: accountId }, account);
-        } catch (e) {
-            console.error(e);
-            return res.send(JSON.stringify({
-                code: Code.FAIL,
-                message: e
-            }));
-        }
-        res.send(JSON.stringify({
-            code: Code.SUCCESS,
-            /**
-             * for development purpose only
-             */
-            // message: account.verificationCode
-        }));
     }
+
+    /**
+     *  For update profile
+     * @param req 
+     * @param res 
+     */
+    async bindPhoneAndSendVerificationCode(req: Request, res: Response) {
+        const userId = this.getUserId(req);
+        const phone = req.body.phone;
+
+        if(userId){
+            const accountId = await this.model.bindPhoneNumber(phone, userId);
+            const r = await this.model.sendVerificationCodeAfterLogin(accountId, phone);
+            return res.send(r);
+        }else{
+            return res.send({
+                code: Code.FAIL,
+                message: "user did not login"
+            });
+        }
+    }
+
 
     async gv1_verifyCode(req: Request, res: Response) {
         res.setHeader('Content-Type', 'application/json');
@@ -655,107 +657,129 @@ export class AccountController extends Controller {
         }
     }
 
-    async gv1_update(req: Request, res: Response) {
+    // "Accounts/saveProfile" return
+    //     username: this.model.username,
+    //     newPhone: this.model.phone,
+    //     code: this.model.verificationCode,
+    //     location: this.saveLocation ? this.location : null,
+    //     secondPhone: this.model.secondPhone
+    async saveProfile(req: Request, res: Response) {
         res.setHeader('Content-Type', 'application/json');
         let token: string = req.get('Authorization') || "";
         token = token.replace("Bearer ", "");
         const cfg = new Config();
-        let accountId = "";
-        try {
-            //@ts-ignore
-            accountId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
-        } catch (e) {
-            console.error(e);
-            return res.send(JSON.stringify({
-                code: Code.FAIL,
-                message: "authentication failed"
-            }));
-        }
-        let account = await this.accountModel.findOne({ _id: new ObjectId(accountId) });
-        if (!account) {
-            return res.send(JSON.stringify({
-                code: Code.FAIL,
-                message: "no such account"
-            }));
-        }
-        logger.info("--- BEGIN ACCOUNT PROFILE CHANGE ---");
-        logger.info(`Account ID: ${account._id}, username: ${account.username}`);
-        let { location, secondPhone, newPhone, code, username } = req.body;
-        logger.info(`newPhone: ${newPhone}, oldPhone: ${account.phone}`)
-        if (newPhone !== account.phone) {
-            logger.info("trying to change phone number");
-            if (account.newPhone === newPhone && account.verificationCode === code) {
-                // find existing account with new phone
-                logger.info("verification code matches");
-                const existingAccount = await this.accountModel.findOne({ phone: newPhone });
-                if (existingAccount && existingAccount._id.toString() !== account._id.toString()) {
-                    logger.info(`Account with same phone number exists. Account ID: ${existingAccount._id}, username: ${existingAccount.username}`);
-                    logger.info("merge two accounts");
-                    existingAccount.imageurl = existingAccount.imageurl || account.imageurl;
-                    existingAccount.realm = existingAccount.realm || account.realm;
-                    existingAccount.openId = existingAccount.openId || account.openId;
-                    existingAccount.unionId = existingAccount.unionId || account.unionId;
-                    existingAccount.visited = existingAccount.visited || account.visited;
-                    existingAccount.balance = (existingAccount.balance || 0) + (account.balance || 0);
-                    existingAccount.sex = existingAccount.sex === undefined ? account.sex : existingAccount.sex;
-                    existingAccount.attributes = existingAccount.attributes || account.attributes;
-                    if (existingAccount.type && existingAccount.type != 'client' && existingAccount.type != 'user') {
+        
+        const r: any = jwt.verify(token, cfg.JWT.SECRET);
+        
+        const { location, secondPhone, newPhone, code, username } = req.body;
 
-                    } else {
-                        existingAccount.type = existingAccount.type || account.type;
-                    }
-                    if (account.type && account.type != 'client' && account.type != 'user' && account.type != 'tmp') {
-                        existingAccount.type = account.type;
-                    }
-                    logger.info("Disabling new account: " + accountId);
-                    account.openId = account.openId + "_disabled";
-                    account.unionId = account.unionId + "_disabled";
-                    account.phone = account.phone + "_disabled";
-                    account.type = "tmp";
-                    await this.accountModel.updateOne({ _id: account._id }, account);
-                    account = existingAccount;
-                }
-                account.phone = newPhone;
-                account.newPhone = "";
-                account.verificationCode = this.accountModel.getRandomCode();
-                account.verified = true;
-            } else {
-                logger.info("verification code mismatch");
-                logger.info(`Verification code is ${account.verificationCode}, but received ${code}`);
-                logger.info("--- END ACCOUNT PROFILE CHANGE ---");
-                return res.json({
+        if(await this.model.verifyPhone(newPhone, code)){
+            const profile = { username, phone: newPhone, secondPhone, location };
+            const ret = await this.model.saveProfile(r.accountId, profile);
+
+            if(ret.err === 'none'){
+                return res.send({
+                    code: Code.SUCCESS,
+                    data: jwt.sign({ accountId: r.accountId.toString() }, this.cfg.JWT.SECRET, {expiresIn: '30d'})
+                });
+            }else{
+                return res.send({
                     code: Code.FAIL,
-                    message: "verification code mismatch"
+                    message: ret.err
                 });
             }
-        }
-        account.username = username;
-        account.location = location;
-        if (!location) {
-            account.location = null;
-        }
-        if (secondPhone) {
-            secondPhone = secondPhone.substring(0, 2) === "+1" ? secondPhone.substring(2) : secondPhone;
-            account.secondPhone = secondPhone;
-        }
-        try {
-            logger.info("Saving account");
-            await this.accountModel.updateOne({ _id: account._id }, account);
-            logger.info("--- END ACCOUNT PROFILE CHANGE ---");
-            return res.send(JSON.stringify({
-                code: Code.SUCCESS,
-                data: jwt.sign({ accountId: account._id.toString() }, this.cfg.JWT.SECRET, {
-                    expiresIn: '30d'
-                })
-            }));
-        } catch (e) {
-            logger.error("Save failed, " + e);
-            logger.info("--- END ACCOUNT PROFILE CHANGE ---");
-            return res.send(JSON.stringify({
+        }else{
+            return res.send({
                 code: Code.FAIL,
-                message: "save failed"
-            }));
+                message: 'verify phone failed'
+            });
         }
+
+        // let account = await this.accountModel.findOne({ _id: new ObjectId(accountId) });
+        // if (!account) {
+        //     return res.send(JSON.stringify({
+        //         code: Code.FAIL,
+        //         message: "no such account"
+        //     }));
+        // }
+        // logger.info("--- BEGIN ACCOUNT PROFILE CHANGE ---");
+        // logger.info(`Account ID: ${account._id}, username: ${account.username}`);
+        // let { location, secondPhone, newPhone, code, username } = req.body;
+        // logger.info(`newPhone: ${newPhone}, oldPhone: ${account.phone}`)
+        // if (newPhone !== account.phone) {
+        //     logger.info("trying to change phone number");
+        //     if (account.newPhone === newPhone && account.verificationCode === code) {
+        //         // find existing account with new phone
+        //         logger.info("verification code matches");
+        //         const existingAccount = await this.accountModel.findOne({ phone: newPhone });
+        //         if (existingAccount && existingAccount._id.toString() !== account._id.toString()) {
+        //             logger.info(`Account with same phone number exists. Account ID: ${existingAccount._id}, username: ${existingAccount.username}`);
+        //             logger.info("merge two accounts");
+        //             existingAccount.imageurl = existingAccount.imageurl || account.imageurl;
+        //             existingAccount.realm = existingAccount.realm || account.realm;
+        //             existingAccount.openId = existingAccount.openId || account.openId;
+        //             existingAccount.unionId = existingAccount.unionId || account.unionId;
+        //             existingAccount.visited = existingAccount.visited || account.visited;
+        //             existingAccount.balance = (existingAccount.balance || 0) + (account.balance || 0);
+        //             existingAccount.sex = existingAccount.sex === undefined ? account.sex : existingAccount.sex;
+        //             existingAccount.attributes = existingAccount.attributes || account.attributes;
+        //             if (existingAccount.type && existingAccount.type != 'client' && existingAccount.type != 'user') {
+
+        //             } else {
+        //                 existingAccount.type = existingAccount.type || account.type;
+        //             }
+        //             if (account.type && account.type != 'client' && account.type != 'user' && account.type != 'tmp') {
+        //                 existingAccount.type = account.type;
+        //             }
+        //             logger.info("Disabling new account: " + accountId);
+        //             account.openId = account.openId + "_disabled";
+        //             account.unionId = account.unionId + "_disabled";
+        //             account.phone = account.phone + "_disabled";
+        //             account.type = "tmp";
+        //             await this.accountModel.updateOne({ _id: account._id }, account);
+        //             account = existingAccount;
+        //         }
+        //         account.phone = newPhone;
+        //         account.newPhone = "";
+        //         account.verificationCode = this.accountModel.getRandomCode();
+        //         account.verified = true;
+        //     } else {
+        //         logger.info("verification code mismatch");
+        //         logger.info(`Verification code is ${account.verificationCode}, but received ${code}`);
+        //         logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+        //         return res.json({
+        //             code: Code.FAIL,
+        //             message: "verification code mismatch"
+        //         });
+        //     }
+        // }
+        // account.username = username;
+        // account.location = location;
+        // if (!location) {
+        //     account.location = null;
+        // }
+        // if (secondPhone) {
+        //     secondPhone = secondPhone.substring(0, 2) === "+1" ? secondPhone.substring(2) : secondPhone;
+        //     account.secondPhone = secondPhone;
+        // }
+        // try {
+        //     logger.info("Saving account");
+        //     await this.accountModel.updateOne({ _id: account._id }, account);
+        //     logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+        //     return res.send(JSON.stringify({
+        //         code: Code.SUCCESS,
+        //         data: jwt.sign({ accountId: account._id.toString() }, this.cfg.JWT.SECRET, {
+        //             expiresIn: '30d'
+        //         })
+        //     }));
+        // } catch (e) {
+        //     logger.error("Save failed, " + e);
+        //     logger.info("--- END ACCOUNT PROFILE CHANGE ---");
+        //     return res.send(JSON.stringify({
+        //         code: Code.FAIL,
+        //         message: "save failed"
+        //     }));
+        // }
     }
 
     async registerTempAccount(req: Request, res: Response) {

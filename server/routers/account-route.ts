@@ -44,7 +44,7 @@ export function AccountRouter(db: DB) {
   // router.post('/sendClientMsg2', (req, res) => { controller.sendClientMsg2(req, res); });
   router.post('/sendClientMsg', (req, res) => { controller.sendClientMsg(req, res); });
   router.post('/verifyPhoneNumber', (req, res) => { controller.verifyPhoneNumber(req, res); });
-  router.post('/sendVerifyMsg', (req, res) => { controller.sendVerifyMsg(req, res); });
+  router.post('/sendVerifyMsg', (req, res) => { controller.sendVerifyMsg(req, res); }); // sign up and then send verify message
   router.post('/applyMerchant', (req, res) => { controller.merchantStuff.applyMerchant(req, res); });
   router.post('/getMerchantApplication', (req, res) => { controller.merchantStuff.getApplication(req, res); });
 
@@ -54,10 +54,13 @@ export function AccountRouter(db: DB) {
   router.post('/registerTempAccount', (req, res) => {controller.registerTempAccount(req, res)});
   router.post('/register', (req, res) => { controller.register(req, res) });
   // when an authenticated user tries to change phone number
-  router.post('/sendVerificationCode', (req, res) => { controller.gv1_sendVerificationCode(req, res) });
+  router.post('/sendVerificationCode', (req, res) => { controller.sendVerificationCodeAfterLogin(req, res) });
+  router.post('/bindPhoneAndSendVerificationCode', (req, res) => { controller.bindPhoneAndSendVerificationCode(req, res) });
+
+  
   // when a user tries to log in with phone number
   router.post('/sendOTPCode', (req, res) => { controller.sendOTPCode(req, res) });
   router.post('/verifyCode', (req, res) => { controller.gv1_verifyCode(req, res) });
-  router.post('/saveProfile', (req, res) => { controller.gv1_update(req, res) });
+  router.post('/saveProfile', (req, res) => { controller.saveProfile(req, res) });
   return router;
 };

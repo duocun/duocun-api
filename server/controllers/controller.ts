@@ -109,18 +109,24 @@ export class Controller {
 
   async getCurrentUser(req: Request, res: Response): Promise<IAccount|null> {
     try {
+      const clientId = this.getUserId(req);
+      return await this.accountModel.findOne({ _id: clientId });
+    } catch (e) {
+      return null;
+    }
+  }
+
+  getUserId(req: Request){
+    try {
       let token = req.get("Authorization");
-      let cfg = new Config();
       if (!token) {
         return null;
       }
       token = token.replace("Bearer ", "");
-      // @ts-ignore
-      const clientId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
-      let account = await this.accountModel.findOne({ _id: clientId });
-      return account;
+      const JWT_SECRET: any = process.env.JWT_SECRET;
+      const data: any = jwt.verify(token, JWT_SECRET);
+      return data.accountId;
     } catch (e) {
-      console.error(e);
       return null;
     }
   }

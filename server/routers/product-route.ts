@@ -18,7 +18,7 @@ export function ProductRouter(db: DB){
 
 
   // old api
-  router.get('/', (req, res) => { controller.list(req, res); });
+  router.get('/', (req, res) => { controller.list(req, res); }); // https://duocun.ca/api/products
   router.get('/paginate/:page/:size', (req, res) => { controller.paginate(req, res) });
   router.get('/qFind', (req, res) => { model.quickFind(req, res); });
   router.get('/clearImage', (req, res) => { model.clearImage(req, res); });
