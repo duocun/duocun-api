@@ -50,7 +50,7 @@ import { EventLogRouter } from "./routers/event-log-route";
 import { PageRouter } from "./routers/page-route";
 import { ToolRouter } from "./routers/tool-route";
 import { ChatMessageRouter } from "./routers/message-route";
-
+import { SettingRouter } from "./routers/setting-route";
 import { CellApplicationRouter } from "./routers/cell-application-route";
 
 import { AreaRouter } from "./routers/area-route";
@@ -223,7 +223,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.use(SVC_PATH + "/Categories", CategoryRouter(dbo));
   app.use(SVC_PATH + "/Products", ProductRouter(dbo));
   app.use(SVC_PATH + "/Pages", PageRouter(dbo));
-
+  app.use(SVC_PATH + "/Setting", SettingRouter(dbo));
   app.use(SVC_PATH + "/Tools", ToolRouter(dbo));
   app.use(SVC_PATH + "/Contacts", ContactRouter(dbo));
   app.use(SVC_PATH + "/Ranges", RangeRouter(dbo));
