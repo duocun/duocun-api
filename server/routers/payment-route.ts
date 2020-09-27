@@ -10,7 +10,7 @@ export function PaymentRouter(db: DB) {
   // input: paymentId
   router.post('/check-payment', (req, res) => { controller.checkPayment(req, res) });
 
-  router.get('/snappay/notify', (req, res) => { controller.snappayNotify(req, res) });
+  router.post('/snappay/notify', (req, res) => { controller.snappayNotify(req, res) });
   // input: paymentId, channelType, gateway
   router.post('/snappay/pay', (req, res) => { controller.snappayPay(req, res) });
 
