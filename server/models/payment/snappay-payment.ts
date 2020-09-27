@@ -149,8 +149,10 @@ export class SnappayPayment {
         let r;
         try{
             r = await axios.post(`https://open.snappay.ca/api/gateway`, data);
+            console.log(`snappay axios return success`);
             Log.save({msg: `snappay axios return success`});
         }catch(e){
+            console.log(`snappay axios return: ${JSON.stringify(e)}`)
             Log.save({msg: `snappay axios return: ${JSON.stringify(e)}`});
         }
         const ret = r?.data;
