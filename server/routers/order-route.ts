@@ -2,10 +2,12 @@ import express, {Request, Response} from "express";
 import { DB } from "../db";
 import { Order } from "../models/order";
 import { OrderController } from "../controllers/order-controller";
+import { PAYMENT_GATEWAY_VENDOR, Setting } from "../models/setting";
 
 export function OrderRouter(db: DB) {
   const router = express.Router();
   const model = new Order(db);
+  const settingModel = new Setting(db);
 
   const controller = new OrderController(model, db);
 
@@ -48,6 +50,7 @@ export function OrderRouter(db: DB) {
   
   router.get('/trends', (req, res) => { model.getOrderTrends(req, res); });
   router.get('/qFind', (req, res) => { model.quickFind(req, res); });
+  router.get('/paymentGateway', (req, res) => { settingModel.getPaymentGatewayVendor(req, res) });
 
 
   router.put('/updatePurchaseTag', (req, res) => { model.updatePurchaseTag(req, res) });
