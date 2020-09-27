@@ -10,6 +10,7 @@ import { Config } from "../../config";
 import { PaymentAction } from "../client-payment";
 import { PaymentError } from "../client-payment";
 import moment from "moment";
+import { Log } from "../log";
 
 const fe = function(arr: any,assertion: any = false){
     return Array.isArray(arr) && arr.length>0 && arr[0] ? (assertion ? arr[0]===assertion: arr[0]) : null;
@@ -263,6 +264,7 @@ export class MonerisPayment extends Payment{
       
     } catch (e) {
       console.error(e);
+      Log.save({ msg: `moneris purchase --- ${JSON.stringify(e)}` });
     //   logger.error('Moneris pay error: ' + e);
     //   logger.info("--- END MONERIS HT PAY ---");
       return {
