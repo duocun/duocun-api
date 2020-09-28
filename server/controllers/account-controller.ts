@@ -70,7 +70,7 @@ export class AccountController extends Controller {
         const {username, password} = req.body;
         this.accountModel.doLogin(username, password).then((tokenId: string) => {
             res.setHeader('Content-Type', 'application/json');
-            res.send(tokenId);
+            res.json(tokenId);
         });
     }
 
