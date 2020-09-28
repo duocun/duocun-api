@@ -52,6 +52,8 @@ export const OrderStatus = {
 export const PaymentMethod = {
   CASH: 'CA',
   WECHAT: 'W',
+  ALI: 'A',
+  UNION: 'U',
   CREDIT_CARD: 'CC',
   PREPAY: 'P'
 };
@@ -757,7 +759,7 @@ export class Order extends Model {
     return t;
   }
 
-
+  // notify post will call multiple times, processAfterPay shall be able to handle the repeated requests.
   // paymentId --- order paymentId
   async processAfterPay(paymentId: string, actionCode: string, amount: number, chargeId: string) {
     logger.info("--- BEGIN PROCESS AFTER PAY ---");
@@ -827,6 +829,8 @@ export class Order extends Model {
         logger.info("Credit not found");
       }
     }
+
+    // called multiple times
     for (let order of orders) {
       if (order.paymentMethod === PaymentMethod.CREDIT_CARD || order.paymentMethod === PaymentMethod.WECHAT) {
         logger.info(`Change product quantity after payment (type: ${order.paymentMethod}). Client Name: ${order.clientName} Payment ID: ${order.paymentId} Order ID: ${order._id}`);

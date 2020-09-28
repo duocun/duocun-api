@@ -31,6 +31,23 @@ export class AccountController extends Controller {
         this.googleOAuthClient = new OAuth2Client(this.cfg.GOOGLE_AUTH_CLIENT_ID);
     }
 
+
+    async getCurrentUser(req: Request, res: Response): Promise<IAccount|null> {
+        try {
+          const tokenId: any = this.getAuthToken(req);
+          if (!tokenId) {
+            return null;
+          }
+          // @ts-ignore
+          const clientId = (jwt.verify(tokenId, this.cfg.JWT.SECRET)).accountId;
+          let account = await this.accountModel.findOne({ _id: clientId });
+          return account;
+        } catch (e) {
+          console.error(e);
+          return null;
+        }
+      }
+      
     loginByPhone(req: Request, res: Response) {
         const phone = req.body.phone;
         const verificationCode = req.body.verificationCode;
@@ -50,12 +67,10 @@ export class AccountController extends Controller {
     }
 
     login(req: Request, res: Response) {
-        const username = req.body.username;
-        const password = req.body.password;
-
+        const {username, password} = req.body;
         this.accountModel.doLogin(username, password).then((tokenId: string) => {
             res.setHeader('Content-Type', 'application/json');
-            res.send(JSON.stringify(tokenId, null, 3));
+            res.json(tokenId);
         });
     }
 
