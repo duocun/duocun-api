@@ -19,10 +19,22 @@ export class Controller {
   public model: Model;
   public db: DB;
   public accountModel: Account;
+
   constructor(model: any, db: DB) {
     this.model = model;
     this.db = db;
     this.accountModel = new Account(db);
+  }
+  
+  getAuthToken(req: Request){
+    const s: any = req.get("Authorization");
+    if (!s) {
+      return null;
+    }else if(s.indexOf('Bearer') !== -1){
+      return s.slice(7); // to remove 'Bear '
+    }else{
+      return s;
+    }
   }
 
   async list(req: Request, res: Response):Promise<void> { 
@@ -107,21 +119,5 @@ export class Controller {
     }
   }
 
-  async getCurrentUser(req: Request, res: Response): Promise<IAccount|null> {
-    try {
-      let token = req.get("Authorization");
-      let cfg = new Config();
-      if (!token) {
-        return null;
-      }
-      token = token.replace("Bearer ", "");
-      // @ts-ignore
-      const clientId = (jwt.verify(token, cfg.JWT.SECRET)).accountId;
-      let account = await this.accountModel.findOne({ _id: clientId });
-      return account;
-    } catch (e) {
-      console.error(e);
-      return null;
-    }
-  }
+
 }

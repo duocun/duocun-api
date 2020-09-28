@@ -23,6 +23,8 @@ export const TransactionAction = {
   PAY_DRIVER_CASH: { code: 'PDCH', name: 'client pay driver cash' }, // 'client pay cash', 'pay cash'
   PAY_BY_CARD: { code: 'PC', name: 'client pay by card' }, // 'pay by card'
   PAY_BY_WECHAT: { code: 'PW', name: 'client pay by wechat' }, // 'pay by wechat'
+  PAY_BY_ALI: { code: 'PA', name: 'client pay by ali' }, // 'pay by wechat'
+  PAY_BY_UNIONPAY: { code: 'PU', name: 'client pay by unionpay' }, // 'pay by wechat'
 
   PAY_MERCHANT_CASH: { code: 'PMCH', name: 'driver pay merchant cash' }, // pay merchant
   PAY_MERCHANT_BY_CARD: { code: 'PMC', name: 'driver pay merchant by card' }, // pay merchant by card

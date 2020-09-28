@@ -1,34 +1,32 @@
-import express, { Request, Response } from "express";
+import express from "express";
 import { DB } from "../db";
+import { PaymentController } from "../controllers/payment-controller";
 import { Payment } from "../models/payment";
-import { Model } from "../models/model";
 
 export function PaymentRouter(db: DB) {
   const router = express.Router();
-  const controller = new Payment(db);
+  const controller = new PaymentController(new Payment(db), db);
 
-  // v2 api
-  router.get('/', (req, res) => { controller.list(req, res) });
-  // router.get('/sync', (req, res) => { controller.sync(req, res) });
+  // input: paymentId
+  router.post('/check-payment', (req, res) => { controller.checkPayment(req, res) });
+
+  router.post('/snappay/notify', (req, res) => { controller.snappayNotify(req, res) });
+  // input: paymentId, channelType, gateway
+  router.post('/snappay/pay', (req, res) => { controller.snappayPay(req, res) });
+
+  // input: paymentId, channelType, gateway: "qrcode" | "jsapi" | "h5"
+  router.post('/alphapay/pay', (req, res) => { controller.alphapayPay(req, res) });
+  router.post('/alphapay/notify', (req, res) => { controller.alphapayNotify(req, res) });
+
+
+  // input: paymentId, cc, cvd, exp
+  router.post('/moneris/pay', (req, res) => { controller.monerisPay(req, res) });
+  // // input: paymentId
+  // router.post('/moneris/preload', (req, res) => { controller.monerisPreload(req, res) });
+  // // input: paymentId, ticket
+  // router.post('/moneris/receipt', (req, res) => { controller.monerisReceipt(req, res) });
 
   return router;
 };
 
 
-export class PaymentController extends Model {
-  // model: Payment;
-
-  constructor(db: DB) {
-    super(db, 'payments');
-  }
-
-  sync(req: Request, res: Response) {
-    // const phone = req.body.phone;
-    // const verificationCode = req.body.verificationCode;
-
-    // this.model.sync().then(() => {
-    //   res.setHeader('Content-Type', 'application/json');
-    //   res.send(JSON.stringify({status: 'success'}, null, 3));
-    // });
-  }
-}

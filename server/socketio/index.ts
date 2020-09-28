@@ -62,6 +62,13 @@ export default (server: any, db: DB) => {
       if (data.image) {
         let base64Image = data.image.split(";base64,").pop();
         let fname = `admin_chat_image_${Date.now().toString()}.png`;
+
+        const folderPath = path.join(__dirname, "../uploads");
+        console.log(folderPath);
+        if(!fs.existsSync(folderPath)){
+
+          fs.mkdirSync(folderPath);
+        }
         let fpath = path.join(__dirname, "../uploads", fname);
         fs.writeFileSync(fpath, base64Image, { encoding: "base64" });
 
@@ -93,6 +100,7 @@ export default (server: any, db: DB) => {
             receiverImg: "",
             createdAt: data.createdAt,
             message: data.message,
+            category: data.category,
             image: imageUrl,
             read: false,
           };
@@ -112,6 +120,7 @@ export default (server: any, db: DB) => {
           receiverImg: "",
           createdAt: data.createdAt,
           message: data.message,
+          category: data.category,
           read: false,
         };
         await chatMessage.insertOne(newMessage);
@@ -153,6 +162,14 @@ export default (server: any, db: DB) => {
         let base64Image = data.image.split(";base64,").pop();
         let fname = `customer_chat_image_${Date.now().toString()}.png`;
         let fpath = path.join(__dirname, "../uploads", fname);
+
+        const folderPath = path.join(__dirname, "../uploads");
+        console.log(folderPath);
+        if(!fs.existsSync(folderPath)){
+
+          fs.mkdirSync(folderPath);
+        }
+        
         fs.writeFileSync(fpath, base64Image, { encoding: "base64" });
         const cfg = new Config();
         const s3 = new AWS.S3({
@@ -189,6 +206,7 @@ export default (server: any, db: DB) => {
             receiverImg: "",
             createdAt: data.createdAt,
             message: data.message,
+            category: data.category,
             image: imageUrl,
             read: false,
           };
@@ -206,6 +224,7 @@ export default (server: any, db: DB) => {
           receiverImg: "",
           createdAt: data.createdAt,
           message: data.message,
+          category: data.category,
           read: false,
         };
         await chatMessage.insertOne(newMessage);

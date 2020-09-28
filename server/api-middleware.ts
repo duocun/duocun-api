@@ -51,8 +51,8 @@ export class ApiMiddleWare {
     //   // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges` ||
     //   // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges/overRange` ||
     //   // req.path === `/${cfg.SERVER.SVC_PATH}/Ranges/inRange` ||
-    //   // req.path === `/${cfg.SERVER.SVC_PATH}/ClientPayments/notify` ||
-    //   // req.path === `/${cfg.SERVER.SVC_PATH}/ClientPayments/alphapay/success` ||
+    //   // req.path === `/${cfg.SERVER.SVC_PATH}/Payments/snappay/notify` ||
+    //   // req.path === `/${cfg.SERVER.SVC_PATH}/Payments/alphapay/notify` ||
     //   // req.path.indexOf(`/${cfg.SERVER.SVC_PATH}/Messages`) !== -1 ||
     //   // req.path.indexOf(`${cfg.SERVER.SVC_PATH}`) !== -1 ||
     //   // (req.path.includes(`/${cfg.SERVER.SVC_PATH}/Categories/G`) && req.method == "GET") ||
