@@ -33,38 +33,38 @@ export class SnappayPayment {
         const trans_amount = Math.round(amount * 100) / 100;
 
         return method === SnappayMethod.WEB ?
-        {
-            // the order matters
-            app_id: process.env.SNAPPAY_APP_ID,
-            browser_type: browserType,
-            charset: "UTF-8",
-            description,
-            format: "JSON",
-            merchant_no: process.env.SNAPPAY_MERCHANT_ID,
-            method,
-            notify_url,
-            out_order_no: paymentId,
-            payment_method: paymentMethod,
-            return_url,
-            trans_amount,
-            trans_currency: 'CAD',
-            version: "1.0"
-        } : {
-            // the order matters
-            app_id: process.env.SNAPPAY_APP_ID,
-            charset: "UTF-8",
-            description,
-            format: "JSON",
-            merchant_no: process.env.SNAPPAY_MERCHANT_ID,
-            method,
-            notify_url,
-            out_order_no: paymentId,
-            payment_method: paymentMethod,
-            return_url,
-            trans_amount,
-            trans_currency: 'CAD',
-            version: "1.0"
-        };
+            {
+                // the order matters
+                app_id: process.env.SNAPPAY_APP_ID,
+                browser_type: browserType,
+                charset: "UTF-8",
+                description,
+                format: "JSON",
+                merchant_no: process.env.SNAPPAY_MERCHANT_ID,
+                method,
+                notify_url,
+                out_order_no: paymentId,
+                payment_method: paymentMethod,
+                return_url,
+                trans_amount,
+                trans_currency: 'CAD',
+                version: "1.0"
+            } : {
+                // the order matters
+                app_id: process.env.SNAPPAY_APP_ID,
+                charset: "UTF-8",
+                description,
+                format: "JSON",
+                merchant_no: process.env.SNAPPAY_MERCHANT_ID,
+                method,
+                notify_url,
+                out_order_no: paymentId,
+                payment_method: paymentMethod,
+                return_url,
+                trans_amount,
+                trans_currency: 'CAD',
+                version: "1.0"
+            };
     }
 
     createLinkstring(data: any) {
@@ -83,28 +83,28 @@ export class SnappayPayment {
         return data;
     }
 
-    getPaymentError(paymentMethod: string){
+    getPaymentError(paymentMethod: string) {
         let err = PaymentError.NONE;
-        if(paymentMethod === SnappayPaymentMethod.ALI){
+        if (paymentMethod === SnappayPaymentMethod.ALI) {
             err = PaymentError.ALIPAY_FAIL;
-        }else if(paymentMethod === SnappayPaymentMethod.WECHAT){
+        } else if (paymentMethod === SnappayPaymentMethod.WECHAT) {
             err = PaymentError.WECHATPAY_FAIL;
-        }else if(paymentMethod === SnappayPaymentMethod.UNIONPAY){
+        } else if (paymentMethod === SnappayPaymentMethod.UNIONPAY) {
             err = PaymentError.UNIONPAY_FAIL;
-        }else{
+        } else {
             // pass
         }
         return err;
     }
 
-    getPaymentUrl(method: string, data: any){
-        if(method === 'pay.webpay'){
+    getPaymentUrl(method: string, data: any) {
+        if (method === 'pay.webpay') {
             return data && data[0] ? data[0].webpay_url : ""
-        }else if(method === 'pay.h5pay') {
+        } else if (method === 'pay.h5pay') {
             return data && data[0] ? data[0].h5pay_url : ""
-        }else if(method === SnappayMethod.QRCODE){
+        } else if (method === SnappayMethod.QRCODE) {
             return data && data[0] ? data[0].qrcode_url : ""
-        }else{
+        } else {
             return '';
         }
     }
@@ -135,7 +135,7 @@ export class SnappayPayment {
         paymentId: string,
         browserType: string
     ): Promise<IPaymentResponse> {
-        
+
         const d = this.getPostData(
             method,
             paymentMethod,
@@ -147,30 +147,31 @@ export class SnappayPayment {
         );
         const data = this.signPostData(d);
         let r: any;
-        try{
+        try {
             console.log(`snappay post req --- ${JSON.stringify(data)}`)
-            Log.save({msg: `snappay post req --- ${JSON.stringify(data)}`});
-            r = await axios.post(`https://open.snappay.ca/api/gateway`, data).catch(e => { });
+            Log.save({ msg: `snappay post req --- ${JSON.stringify(data)}` });
+            r = await axios.post(`https://open.snappay.ca/api/gateway`, data);
             console.log(`snappay axios return success`);
-            Log.save({msg: `snappay axios return success`});
-        }catch(e){
+            Log.save({ msg: `snappay axios return success` });
+        } catch (e) {
             console.log(`snappay axios return: ${JSON.stringify(e)}`)
-            Log.save({msg: `snappay axios return: ${JSON.stringify(e)}`});
-        }
-        const ret = r?.data;
-        const code = ret ? ret.code : "";
-        const status = ret.msg === 'success'? ResponseStatus.SUCCESS : ResponseStatus.FAIL;
-        const msg = "msg:" + (ret ? ret.msg : "N/A");
+            Log.save({ msg: `snappay axios return: ${JSON.stringify(e)}` });
+        } finally {
+            const ret = r?.data;
+            const code = ret ? ret.code : "";
+            const status = (ret && ret.msg === 'success') ? ResponseStatus.SUCCESS : ResponseStatus.FAIL;
+            const msg = "msg:" + (ret ? ret.msg : "N/A");
 
-        return {
-          status,
-          code,             // stripe/snappay code
-          decline_code: "", // stripe decline_code
-          msg,              // stripe/snappay retrun message
-          chargeId: "",     // stripe only { chargeId:x }
-          url: this.getPaymentUrl(method, ret.data),
-          err: ret.msg === 'success' ? PaymentError.NONE : this.getPaymentError(paymentMethod)
-        };
+            return {
+                status,
+                code,             // stripe/snappay code
+                decline_code: "", // stripe decline_code
+                msg,              // stripe/snappay retrun message
+                chargeId: "",     // stripe only { chargeId:x }
+                url: ret ? this.getPaymentUrl(method, ret.data) : '',
+                err: (ret && ret.msg === 'success') ? PaymentError.NONE : this.getPaymentError(paymentMethod)
+            };
+        }
     }
 
     // fix me

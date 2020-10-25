@@ -8,6 +8,8 @@
       "type": "node",
       "request": "launch",
       "name": "Launch Program",
+      "sourceMaps": true,
+      "smartStep": true,
       "program": "${workspaceFolder}/server/server.ts",
       "outFiles": [
         "${workspaceFolder}/dist/*.js"
