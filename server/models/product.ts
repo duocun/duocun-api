@@ -48,6 +48,7 @@ export interface IProduct {
   cost: number;
   merchantId: string;
   categoryId: string;
+  scheduleId: string;
 
   openDays?: number[];
 
