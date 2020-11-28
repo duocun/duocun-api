@@ -247,7 +247,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   });
 
   // setupSocket(server);
-  socketio(server, dbo);
+  socketio(server, SVC_PATH, dbo);
 });
 
 app.use(cors());

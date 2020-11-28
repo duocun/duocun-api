@@ -16,11 +16,13 @@ const s3 = new AWS.S3({
 
 export let SocketIO: socketio.Server | null = null;
 
-export default (server: any, db: DB) => {
+export default (server: any, svc_path: string | undefined, db: DB) => {
   if (SocketIO) {
     return SocketIO;
   }
-  const io = socketio.listen(server);
+  const io = socketio.listen(server, {
+    path: svc_path + '/socket.io' ?? '/socket.io'
+  });
   io.on("connection", (socket) => {
     // socket id when user reconnected
     console.log(`user connected, id is ${socket.id}`);
