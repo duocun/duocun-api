@@ -208,19 +208,22 @@ class ProductController extends Model {
         const product: IProduct = await this.productModel.getById(productID);
         if (product.scheduleId) {
           const schedule: ISchedule = await this.scheduleModel.getById(product.scheduleId);
-          const availableArea = schedule.areas.find(async a => {
+          let availableArea;
+          for (const a of schedule.areas) {
             const area: IArea = await this.areaModel.getById(a.areaId);
             if (area && area.coords) {
-              return this.areaModel.inPolygon(
+              if (this.areaModel.inPolygon(
                 {
                   lat: parseFloat(lat),
                   lng: parseFloat(lng),
                 },
                 area.coords,
-              );
+              )) {
+                availableArea = a;
+                break;
+              }
             }
-            return false;
-          });
+          }
           if (availableArea) {
             const today = moment().format('YYYY-MM-DD');
             let dates: string[] = [];
