@@ -268,18 +268,24 @@ class ProductController extends Model {
                 dates.push(moment(curDate).add(7, 'd').format('YYYY-MM-DD'));
               }
             } else {
+              let curDate;
               dates = dates.filter(date => {
                 if (date === moment().format('YYYY-MM-DD')) {
+                  curDate = date;
                   return false;
                 }
                 if (date === moment().add(1, 'd').format('YYYY-MM-DD')) {
                   if (moment().diff(moment(date), 'h') < endTimeMargin + 1) {
                     return true;
                   }
+                  curDate = date;
                   return false;
                 }
                 return true;
               });
+              if (curDate) {
+                dates.push(moment(curDate).add(7, 'd').format('YYYY-MM-DD'));
+              }
             }
             dates.sort();
             const schedules: {
