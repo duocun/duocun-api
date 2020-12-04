@@ -253,15 +253,20 @@ class ProductController extends Model {
             });
             const endTimeMargin = parseInt(schedule.endTimeMargin, 10);
             if (endTimeMargin > -1) {
+              let curDate;
               dates = dates.filter(date => {
                 if (date === moment().format('YYYY-MM-DD')) {
                   if (moment().diff(moment(date), 'h') < endTimeMargin) {
                     return true;
                   }
+                  curDate = date;
                   return false;
                 }
                 return true;
               });
+              if (curDate) {
+                dates.push(moment(curDate).add(7, 'd').format('YYYY-MM-DD'));
+              }
             } else {
               dates = dates.filter(date => {
                 if (date === moment().format('YYYY-MM-DD')) {
