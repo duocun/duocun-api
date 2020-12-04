@@ -5,7 +5,7 @@ import { ObjectID, Collection } from "mongodb";
 import { Request, Response } from "express";
 
 
-export interface MessageItem{
+export interface MessageItem {
   _id: string;
   sender: string;
   receiver: string;
@@ -18,18 +18,18 @@ export interface MessageItem{
   read: boolean;
 }
 
-export class ChatMessage extends Model{
-  constructor(db: DB){
+export class ChatMessage extends Model {
+  constructor(db: DB) {
     super(db, "messages");
   }
 
-  getChatMessages(req: Request, res: Response){    
+  getChatMessages(req: Request, res: Response) {
     let { userId, pageIndex } = req.params;
     let offset = parseInt(pageIndex) * 20;
-    
+
     const query = { $or: [{ sender: userId }, { receiver: userId }] };
     // console.log(q);
-    let messageData = this.find(query, {skip: offset, limit: 20, sort: [["createdAt", -1]]}).then(messageData => {
+    let messageData = this.find(query, { skip: offset, limit: 20, sort: [["createdAt", -1]] }).then(messageData => {
       res.send(
         JSON.stringify({
           code: Code.SUCCESS,
@@ -39,13 +39,44 @@ export class ChatMessage extends Model{
     });
   }
 
-  resetMessage(req: Request, res: Response){
+  getUnreadMessagesCount(req: Request, res: Response): void {
+    const { userId } = req.params;
+    this.getCollection().then((c: Collection) => {
+      c.countDocuments({ $and: [{ receiver: userId}, { read: false }] }, (err, r: any) => {
+        if (err) {
+          console.log(err);
+        } else {
+          res.send({
+            code: 'success',
+            data: r
+          });
+        }
+      });
+    });
+  }
+
+  resetMessages(req: Request, res: Response) {
+    const { userId } = req.params;
+    this.getCollection().then((c: Collection) => {
+      c.updateMany({ receiver: userId }, { $set: { read: true, readAt: Date.now() } }, (err, r: any) => {
+        if (err) {
+          console.log(err);
+        } else {
+          res.send({
+            code: 'success'
+          });
+        }
+      });
+    });
+  }
+
+  resetMessage(req: Request, res: Response) {
     let messageId = req.params.messageId;
     this.getCollection().then((c: Collection) => {
-      c.updateOne({_id: new ObjectID(messageId)}, { $set: {read : true, readAt: Date.now()}}, (err, r:any) => {
-        if(err){
+      c.updateOne({ _id: new ObjectID(messageId) }, { $set: { read: true, readAt: Date.now() } }, (err, r: any) => {
+        if (err) {
           console.log(err);
-        }else{
+        } else {
           res.send(
             JSON.stringify({
               code: 'success',

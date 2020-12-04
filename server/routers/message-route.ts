@@ -7,7 +7,9 @@ export function ChatMessageRouter(db: DB){
   const controller = new ChatMessage(db);
   // customer service
   router.get('/:userId/:pageIndex', (req, res) => { controller.getChatMessages(req, res) } );
-  router.get('/chatmessages/reset/:messageId', (req, res) => { controller.resetMessage(req, res); });
+  router.get('/users/:userId/reset', (req, res) => { controller.resetMessages(req, res); });
+  router.get('/users/:userId/unread', (req, res) => { controller.getUnreadMessagesCount(req, res); });
+  router.get('/reset/:messageId', (req, res) => { controller.resetMessage(req, res); });
 
   return router;
 };
