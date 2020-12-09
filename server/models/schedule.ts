@@ -7,6 +7,7 @@ export interface ISchedule {
   _id: string;
   title: string;
   description: string;
+  isSpecial: boolean;
   areas: {
     areaId: string;
     periods: {

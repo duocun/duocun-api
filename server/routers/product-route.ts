@@ -229,24 +229,40 @@ class ProductController extends Model {
             let dates: string[] = [];
             availableArea.periods.forEach(period => {
               period.dows.forEach(dow => {
-                const diff1 = moment(today).diff(moment(today).day(dow), 'h');
-                if (diff1 < 1
-                  && diff1 > -24 * 6 - 1
-                  && moment(today).day(dow).diff(moment(period.startDate), 'h') > -1
-                  && moment(today).day(dow).diff(moment(period.endDate), 'h') < 1) {
-                  const date = moment(today).day(dow).format('YYYY-MM-DD');
-                  if (!dates.includes(date)) {
-                    dates.push(date);
+                if (schedule.isSpecial) {
+                  let index = 0;
+                  while (moment(today).day(dow + index * 7).diff(moment(period.endDate), 'h') < 1) {
+                    const diff = moment(today).diff(moment(today).day(dow + index * 7), 'h');
+                    if (diff < 1
+                      && moment(today).day(dow + index * 7).diff(moment(period.startDate), 'h') > -1
+                      && moment(today).day(dow + index * 7).diff(moment(period.endDate), 'h') < 1) {
+                      const date = moment(today).day(dow + index * 7).format('YYYY-MM-DD');
+                      if (!dates.includes(date)) {
+                        dates.push(date);
+                      }
+                    }
+                    index++;
                   }
-                }
-                const diff2 = moment(today).diff(moment(today).day(dow + 7), 'h');
-                if (diff2 < 1
-                  && diff2 > -24 * 6 - 1
-                  && moment(today).day(dow + 7).diff(moment(period.startDate), 'h') > -1
-                  && moment(today).day(dow + 7).diff(moment(period.endDate), 'h') < 1) {
-                  const date = moment(today).day(dow + 7).format('YYYY-MM-DD');
-                  if (!dates.includes(date)) {
-                    dates.push(date);
+                } else {
+                  const diff1 = moment(today).diff(moment(today).day(dow), 'h');
+                  if (diff1 < 1
+                    && diff1 > -24 * 6 - 1
+                    && moment(today).day(dow).diff(moment(period.startDate), 'h') > -1
+                    && moment(today).day(dow).diff(moment(period.endDate), 'h') < 1) {
+                    const date = moment(today).day(dow).format('YYYY-MM-DD');
+                    if (!dates.includes(date)) {
+                      dates.push(date);
+                    }
+                  }
+                  const diff2 = moment(today).diff(moment(today).day(dow + 7), 'h');
+                  if (diff2 < 1
+                    && diff2 > -24 * 6 - 1
+                    && moment(today).day(dow + 7).diff(moment(period.startDate), 'h') > -1
+                    && moment(today).day(dow + 7).diff(moment(period.endDate), 'h') < 1) {
+                    const date = moment(today).day(dow + 7).format('YYYY-MM-DD');
+                    if (!dates.includes(date)) {
+                      dates.push(date);
+                    }
                   }
                 }
               });
