@@ -45,6 +45,7 @@ import { RangeRouter } from "./routers/range-route";
 import { MallRouter } from "./routers/mall-route";
 import { LocationRouter } from "./routers/location-route";
 import { PickupRouter } from "./routers/pickup-route";
+import { PickupByOrderRouter } from "./routers/pickup-by-order-route";
 import { DriverRouter } from "./routers/driver-route";
 import { DriverShiftRouter } from "./routers/driver-shift-route";
 import { DriverScheduleRouter } from "./routers/driver-schedule-route";
@@ -211,6 +212,7 @@ dbo.init(cfg.DATABASE).then((dbClient) => {
   app.use(SVC_PATH + "/Malls", MallRouter(dbo));
   app.use(SVC_PATH + "/Locations", LocationRouter(dbo));
   app.use(SVC_PATH + "/Pickups", PickupRouter(dbo));
+  app.use(SVC_PATH + "/PickupsByOrder", PickupByOrderRouter(dbo));
   app.use(SVC_PATH + "/Drivers", DriverRouter(dbo));
 
   app.use(SVC_PATH + "/Distances", DistanceRouter(dbo));
