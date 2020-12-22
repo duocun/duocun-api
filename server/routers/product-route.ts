@@ -294,7 +294,7 @@ class ProductController extends Model {
                   if (moment().diff(moment(date), 'h') < endTimeMargin + 1) {
                     return true;
                   }
-                  curDate = date;
+                  curDate = moment().format('YYYY-MM-DD');
                   return false;
                 }
                 return true;
