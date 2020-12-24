@@ -280,27 +280,30 @@ class ProductController extends Model {
                 }
                 return true;
               });
-              if (curDate) {
+              if (curDate && !schedule.isSpecial && moment(curDate).add(7, 'd').diff(moment(schedule.endDate), 'h') < 1) {
                 dates.push(moment(curDate).add(7, 'd').format('YYYY-MM-DD'));
               }
             } else {
-              let curDate;
+              let curDate1, curDate2;
               dates = dates.filter(date => {
                 if (date === moment().format('YYYY-MM-DD')) {
-                  curDate = date;
+                  curDate1 = date;
                   return false;
                 }
                 if (date === moment().add(1, 'd').format('YYYY-MM-DD')) {
                   if (moment().diff(moment(date), 'h') < endTimeMargin + 1) {
                     return true;
                   }
-                  curDate = date;
+                  curDate2 = date;
                   return false;
                 }
                 return true;
               });
-              if (curDate) {
-                dates.push(moment(curDate).add(7, 'd').format('YYYY-MM-DD'));
+              if (curDate1 && !schedule.isSpecial && moment(curDate1).add(7, 'd').diff(moment(schedule.endDate), 'h') < 1) {
+                dates.push(moment(curDate1).add(7, 'd').format('YYYY-MM-DD'));
+              }
+              if (curDate2 && !schedule.isSpecial && moment(curDate2).add(7, 'd').diff(moment(schedule.endDate), 'h') < 1) {
+                dates.push(moment(curDate2).add(7, 'd').format('YYYY-MM-DD'));
               }
             }
             dates.sort();
