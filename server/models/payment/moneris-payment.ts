@@ -1,6 +1,6 @@
 import { Model, Code } from "../model";
-import { Account } from "../account";
-import { IOrder, Order, OrderStatus, PaymentMethod, PaymentStatus} from "../order";
+import { Account, IAccount } from "../account";
+import { IOrder, Order, OrderStatus, PaymentMethod, PaymentStatus } from "../order";
 import { Payment } from "./index";
 import { DB } from "../../db";
 import MonerisHt from 'moneris-node';
@@ -12,17 +12,17 @@ import { PaymentError } from "../client-payment";
 import moment from "moment";
 import { Log } from "../log";
 
-const fe = function(arr: any,assertion: any = false){
-    return Array.isArray(arr) && arr.length>0 && arr[0] ? (assertion ? arr[0]===assertion: arr[0]) : null;
+const fe = function (arr: any, assertion: any = false) {
+  return Array.isArray(arr) && arr.length > 0 && arr[0] ? (assertion ? arr[0] === assertion : arr[0]) : null;
 }
-  
+
 const cfg = new Config();
 
 export const moneris = new MonerisCheckout(
   cfg.MONERIS.STORE_ID,
   cfg.MONERIS.API_TOKEN,
   cfg.MONERIS.CHECKOUT_ID,
-  <EnvironmentType> cfg.MONERIS.ENVIRONMENT
+  <EnvironmentType>cfg.MONERIS.ENVIRONMENT
 );
 
 export const monerisHt = new MonerisHt({
@@ -32,24 +32,24 @@ export const monerisHt = new MonerisHt({
   test: false
 });
 
-export class MonerisPayment extends Payment{
-    constructor(db: DB) {
-        super(db);
-    }
+export class MonerisPayment extends Payment {
+  constructor(db: DB) {
+    super(db);
+  }
 
-    async preload(tokenId: string, paymentId: string) {
-        // logger.info("--- BEGIN ALPHA PAY---");
-        const r: any = await this.getPaymentInfo(tokenId, paymentId);
-        let account;
-        let orders;
-        let total;
-        if(r.code === Code.SUCCESS){
-          account = r.account;
-          orders = r.orders;
-          total = r.total;
-        }else{
-          return r; // {code, msg}
-        }
+  async preload(tokenId: string, paymentId: string) {
+    // logger.info("--- BEGIN ALPHA PAY---");
+    const r: any = await this.getPaymentInfo(tokenId, paymentId);
+    let account;
+    let orders;
+    let total;
+    if (r.code === Code.SUCCESS) {
+      account = r.account;
+      orders = r.orders;
+      total = r.total;
+    } else {
+      return r; // {code, msg}
+    }
     // logger.info("--- BEGIN MONERIS PRELOAD ---");
 
     // const paymentId = req.body.paymentId;
@@ -99,8 +99,8 @@ export class MonerisPayment extends Payment{
       }
     } catch (e) {
       console.error(e);
-    //   logger.error(e);
-    //   logger.info("--- END MONERIS PRELOAD ---");
+      //   logger.error(e);
+      //   logger.info("--- END MONERIS PRELOAD ---");
       return {
         code: Code.FAIL,
         data: e
@@ -113,8 +113,8 @@ export class MonerisPayment extends Payment{
     // const account = await this.getCurrentUser(req, res);
     const account = await this.accountModel.getAccountByToken(tokenId);
     if (!account) {
-    //   logger.info("authentication failed");
-    //   logger.info("--- END MONERIS PRELOAD ---");
+      //   logger.info("authentication failed");
+      //   logger.info("--- END MONERIS PRELOAD ---");
       return {
         code: Code.FAIL,
         message: "authentication failed"
@@ -131,24 +131,24 @@ export class MonerisPayment extends Payment{
       paymentId
     });
     if (!cc) {
-    //   logger.info("client credit not found");
-    //   logger.info("--- END MONERIS PRELOAD ---");
+      //   logger.info("client credit not found");
+      //   logger.info("--- END MONERIS PRELOAD ---");
       return {
         code: Code.FAIL,
         message: "client credits empty"
       };
     }
     if (receipt.response.success != BooleanType.TRUE) {
-    //   logger.info("moneris response does not return true");
-    //   logger.info("--- END MONERIS PRELOAD ---");
+      //   logger.info("moneris response does not return true");
+      //   logger.info("--- END MONERIS PRELOAD ---");
       return {
         code: Code.FAIL,
         data: receipt
       };
     }
     if (!receipt.response.receipt || !receipt.response.receipt.cc || !receipt.response.receipt.cc.amount) {
-    //   logger.info("moneris receipt response is invalid");
-    //   logger.info("--- END MONERIS PRELOAD ---");
+      //   logger.info("moneris receipt response is invalid");
+      //   logger.info("--- END MONERIS PRELOAD ---");
       return {
         code: Code.FAIL,
         data: receipt
@@ -165,42 +165,42 @@ export class MonerisPayment extends Payment{
     };
   }
 
-  async pay(tokenId: string, paymentId: string, cc: any, cvd: any, exp: any) {
+  async pay(tokenId: string, paymentId: string, cc: any, cvd: any, exp: any, zipCode: string, save: boolean = false) {
     // logger.info('--- BEGIN MONERIS HT PAY ---');
     const r: any = await this.getPaymentInfo(tokenId, paymentId);
-    let account;
+    let account: IAccount;
     let orders;
     let total;
-    if(r.code === Code.SUCCESS){
+    if (r.code === Code.SUCCESS) {
       account = r.account;
       orders = r.orders;
       total = r.total;
-    }else{
+    } else {
       return r; // {code, msg}
     }
 
     if (!cc) {
-        return {
-          code: Code.FAIL,
-          message: 'credit_cart_empty'
-        };
-      }
-      if (!cvd) {
-        return {
-          code: Code.FAIL,
-          message: 'cvd_empty'
-        };
-      }
-      if (!exp) {
-        return {
-          code: Code.FAIL,
-          message: 'exp_empty'
-        };
-      }
+      return {
+        code: Code.FAIL,
+        message: 'credit_cart_empty'
+      };
+    }
+    if (!cvd) {
+      return {
+        code: Code.FAIL,
+        message: 'cvd_empty'
+      };
+    }
+    if (!exp) {
+      return {
+        code: Code.FAIL,
+        message: 'exp_empty'
+      };
+    }
     cc = cc.replace(/\s/g, '');
     exp = exp.replace(/(\s|\/)/g, '');
     cvd = cvd.replace(/\s/g, '');
-    
+
     if (!/^\d{12,20}$/.test(cc)) {
       return {
         code: Code.FAIL,
@@ -226,7 +226,7 @@ export class MonerisPayment extends Payment{
     try {
       await this.orderModel.validateOrders(orders);
     } catch (e) {
-    //   logger.info("--- END MONERIS HT PAY ---");
+      //   logger.info("--- END MONERIS HT PAY ---");
       return {
         code: Code.FAIL,
         data: e
@@ -261,12 +261,12 @@ export class MonerisPayment extends Payment{
           cvd_value: cvd,
         }
       });
-      
+
     } catch (e) {
       console.error(e);
       Log.save({ msg: `moneris purchase --- ${JSON.stringify(e)}` });
-    //   logger.error('Moneris pay error: ' + e);
-    //   logger.info("--- END MONERIS HT PAY ---");
+      //   logger.error('Moneris pay error: ' + e);
+      //   logger.info("--- END MONERIS HT PAY ---");
       return {
         code: Code.FAIL,
         msg: 'payment_failed'
@@ -274,25 +274,25 @@ export class MonerisPayment extends Payment{
     }
     const code = fe(resp.ResponseCode);
     const status = {
-        msg: fe(resp.Message),
-        code,
-        reference: fe(resp.ReferenceNum),
-        iso: fe(resp.ISO),
-        receipt: fe(resp.ReceiptId),
-        raw: resp,
-        isVisa: fe(resp.CardType,"V"),
-        isMasterCard: fe(resp.CardType,"M"),
-        isVisaDebit: fe(resp.IsVisaDebit,"true"),
-        authCode: fe(resp.AuthCode),
-        timeout: fe(resp.TimedOut,"true"),
-        date: fe(resp.TransDate),
-        time: fe(resp.TransTime)
+      msg: fe(resp.Message),
+      code,
+      reference: fe(resp.ReferenceNum),
+      iso: fe(resp.ISO),
+      receipt: fe(resp.ReceiptId),
+      raw: resp,
+      isVisa: fe(resp.CardType, "V"),
+      isMasterCard: fe(resp.CardType, "M"),
+      isVisaDebit: fe(resp.IsVisaDebit, "true"),
+      authCode: fe(resp.AuthCode),
+      timeout: fe(resp.TimedOut, "true"),
+      date: fe(resp.TransDate),
+      time: fe(resp.TransTime)
     };
-    const approved =  !status.timeout && ((code)=="00" || code ? parseInt(code)<50 : false );
+    const approved = !status.timeout && ((code) == "00" || code ? parseInt(code) < 50 : false);
     // logger.info(`Moneris response: Message: ${status.msg}, Code: ${status.code}, Reference: ${status.reference}, ISO: ${status.iso}, timeout: ${status.timeout}, Approved: ${approved}`)
     if (!approved) {
-    //   logger.info('Not approved');
-    //   logger.info("--- END MONERIS HT PAY ---");
+      //   logger.info('Not approved');
+      //   logger.info("--- END MONERIS HT PAY ---");
       return {
         code: Code.FAIL,
         msg: this.getMonerisErrorMessage(status.code),
@@ -309,6 +309,14 @@ export class MonerisPayment extends Payment{
     // logger.info("set client credit status paid");
     await this.clientCreditModel.updateOne({ paymentId: cc.paymentId, status: PaymentStatus.UNPAID }, clientCredit);
     // logger.info("--- END MONERIS PRELOAD ---");
+    if (save) {
+      // save model
+      account.cardInfo = { cc, cvd, exp, zipCode };
+      try {
+        await this.accountModel.updateOne({ _id: account._id }, account);
+      } catch (e) {
+      }
+    }
     return {
       code: Code.SUCCESS,
       err: PaymentError.NONE

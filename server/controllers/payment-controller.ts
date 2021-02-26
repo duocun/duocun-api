@@ -112,8 +112,9 @@ export class PaymentController extends Controller {
 
   async monerisPay(req: Request, res: Response) {
     const tokenId: any = this.getAuthToken(req);
-    const { paymentId, cc, cvd, exp } = req.body;
-    const r = await this.moneris.pay(tokenId, paymentId, cc, cvd, exp);
+    const { paymentId, cc, cvd, exp, zipCode, save } = req.body;
+    const r = await this.moneris.pay(tokenId, paymentId, cc, cvd, exp, zipCode, save);
+
     res.send(r);
   }
 

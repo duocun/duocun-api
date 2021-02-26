@@ -66,6 +66,13 @@ export interface IAccount {
   verificationCode: string;
   verified: boolean;
 
+  cardInfo?: {
+    cc: string;
+    exp: string;
+    cvd: string;
+    zipCode: string;
+  }
+
   attributes?: string[]; // IAccountAttribute's code, I: INDOOR, G: GARDENING, R: ROOFING, O: OFFICE, P: PLAZA, H: HOUSE, C: CONDO
   info?: string; // client info
 
@@ -592,8 +599,7 @@ export class Account extends Model {
           return;
         }
       } catch (e) {
-        const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${
-          e || " Exception"
+        const message = `getAccountByToken Fail: jwt verify exception, tokenId: ${tokenId}  , ${e || " Exception"
           }`;
         await this.eventLogModel.addLogToDB(
           DEBUG_ACCOUNT_ID,
@@ -836,8 +842,7 @@ export class Account extends Model {
         return null;
       }
     } catch (err) {
-      const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${
-        err || "ByOpenId Exception"
+      const message = `accessToken: ${accessToken}  , openId: ${openId}, msg: ${err || "ByOpenId Exception"
         }`;
       await this.eventLogModel.addLogToDB(
         DEBUG_ACCOUNT_ID,
@@ -864,8 +869,7 @@ export class Account extends Model {
           const tokenId = await this.wechatLoginByOpenId(accessToken, openId);
           return { tokenId, accessToken, openId, expiresIn };
         } else {
-          const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${
-            r & r.msg || "LoginByCode Exception"
+          const message = `code: ${code}, errCode: ${r && r.code}, errMsg: ${r & r.msg || "LoginByCode Exception"
             }`;
           console.error(message);
           await this.eventLogModel.addLogToDB(
