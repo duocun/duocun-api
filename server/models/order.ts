@@ -164,7 +164,7 @@ export class Order extends Model {
   }
 
   async getOrderMapForDriver(deliverDate: string, driverId: string) {
-    const qDriverId = driverId && driverId !== UNASSIGNED_DRIVER_ID ? {driverId} : {}; 
+    const qDriverId = driverId && driverId !== UNASSIGNED_DRIVER_ID ? { driverId } : {};
     const q = {
       ...qDriverId,
       deliverDate,
@@ -177,7 +177,7 @@ export class Order extends Model {
 
     orders.forEach((order: IOrder) => {
       const driverId = order.driverId ? order.driverId.toString() : 'unassigned';
-      driverMap[driverId] = {driverId, orders:[]};
+      driverMap[driverId] = { driverId, orders: [] };
     });
 
     orders.forEach((order: IOrder) => {
@@ -192,10 +192,10 @@ export class Order extends Model {
     return driverMap;
   }
 
-  async getRoutes(deliverDate: string, driverId: string){
-      const data = await this.getOrderMapForDriver(deliverDate, driverId);
-      const url = 'https://duocun-route-api.herokuapp.com/routes';
-      return await axios.post(url, data);
+  async getRoutes(deliverDate: string, driverId: string) {
+    const data = await this.getOrderMapForDriver(deliverDate, driverId);
+    const url = 'https://duocun-route-api.herokuapp.com/routes';
+    return await axios.post(url, data);
   }
 
   // v2 return [{
@@ -251,7 +251,7 @@ export class Order extends Model {
       }
     });
 
-    return rs.map(r => ({ 
+    return rs.map(r => ({
       _id: r._id,
       code: r.code,
       location: r.location,
@@ -262,14 +262,14 @@ export class Order extends Model {
       paymentMethod: r.paymentMethod,
       paymentStatus: r.paymentStatus,
       status: r.status,
-      client: r.client, 
+      client: r.client,
       merchant: r.merchant,
       // merchantAccount: r.merchantAccount,
       driver: r.driver,
       note: r.note,
       delivered: r.deliverd,
       created: r.creaded
-     }));
+    }));
   }
 
   // get transactions with items
@@ -310,7 +310,7 @@ export class Order extends Model {
     }
 
     // fix me
-    if(req.query && req.query.query){
+    if (req.query && req.query.query) {
       const s: any = req.query.query;
       query = JSON.parse(s).where;
     }
@@ -545,13 +545,13 @@ export class Order extends Model {
   async insertOne(doc: any): Promise<any> {
     const c: Collection = await this.getCollection();
     doc = this.convertIdFields(doc);
-    if(!doc.created){
+    if (!doc.created) {
       doc.created = moment().toISOString();
     }
     doc.modified = moment().toISOString();
-    const client = await this.accountModel.findOne({_id: doc.clientId});
-    if(client){
-      doc.clientPhone = client.phone? client.phone : '';
+    const client = await this.accountModel.findOne({ _id: doc.clientId });
+    if (client) {
+      doc.clientPhone = client.phone ? client.phone : '';
     }
     const result = await c.insertOne(doc); // InsertOneWriteOpResult
     const ret = (result.ops && result.ops.length > 0) ? result.ops[0] : null;
@@ -571,7 +571,7 @@ export class Order extends Model {
       for (let i = 0; i < orders.length; i++) {
         orders[i].paymentId = paymentId;
         const order: IOrder = orders[i];
-        let savedOrder: IOrder|null = null;
+        let savedOrder: IOrder | null = null;
         try {
           savedOrder = await this.doInsertOneV2(order);
         } catch (e) {
@@ -599,7 +599,7 @@ export class Order extends Model {
     let paymentId: ObjectId;
     do {
       paymentId = new ObjectID();
-    } while(
+    } while (
       await this.findOne({ paymentId })
     )
     return `${paymentId}`;
@@ -613,17 +613,17 @@ export class Order extends Model {
       if (order.status === OrderStatus.NEW
         || order.status === OrderStatus.MERCHANT_CHECKED
       ) {
-        const merchantId: string = order.merchantId? order.merchantId.toString() : null;
+        const merchantId: string = order.merchantId ? order.merchantId.toString() : null;
         const merchantName: string = order.merchantName;
-        const clientId: string = order.clientId? order.clientId.toString() : null;
+        const clientId: string = order.clientId ? order.clientId.toString() : null;
         const clientName = order.clientName;
         const cost = order.cost;
         const total = order.total;
         const delivered = order.delivered;
-        
-        if(merchantId && clientId){
+
+        if (merchantId && clientId) {
           const merchant = await this.merchantModel.findOne({ _id: merchantId });
-          if(merchant && merchant.accountId){
+          if (merchant && merchant.accountId) {
             const merchantAccountId = merchant.accountId.toString();
 
             await this.updateOne({ _id: orderId }, { status: OrderStatus.DELETED });
@@ -635,15 +635,15 @@ export class Order extends Model {
                 items.push({ productId: it.productId, quantity: it.quantity, price: it.price, cost: it.cost, product: product });
               }
             });
-            
+
             await this.transactionModel.updateMany({ orderId: orderId }, { status: 'del' });// This will affect balance calc
             await this.transactionModel.saveTransactionsForRemoveOrder(orderId, merchantAccountId, merchantName, clientId, clientName, cost, total, delivered, items);
             return order;
-          }else{
+          } else {
             return;
           }
 
-        }else{
+        } else {
           return;
         }
       }
@@ -716,16 +716,16 @@ export class Order extends Model {
     for (let i = 0; i < orders.length; i++) {
       const order = orders[i];
       await this.transactionModel.saveTransactionsForPlaceOrder(
-          order._id.toString(),
-          order.type,
-          merchant.accountId.toString(),
-          merchant.name,
-          order.clientId.toString(),
-          order.clientName,
-          order.cost,
-          order.total,
-          order.delivered
-        )
+        order._id.toString(),
+        order.type,
+        merchant.accountId.toString(),
+        merchant.name,
+        order.clientId.toString(),
+        order.clientName,
+        order.cost,
+        order.total,
+        order.delivered
+      )
     }
     return;
   }
@@ -749,7 +749,7 @@ export class Order extends Model {
       fromName: clientName,
       toId: BANK_ID,
       toName: BANK_NAME,
-      amount: Math.round(amount * 100)/100,
+      amount: Math.round(amount * 100) / 100,
       actionCode,
       paymentId,
       delivered
@@ -764,7 +764,7 @@ export class Order extends Model {
   async processAfterPay(paymentId: string, actionCode: string, amount: number, chargeId: string) {
     logger.info("--- BEGIN PROCESS AFTER PAY ---");
     logger.info(`paymentId: ${paymentId}, amount: ${amount}`);
-    const orders = await this.find({ paymentId, status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED] }, paymentStatus: { $ne: PaymentStatus.PAID }});
+    const orders = await this.find({ paymentId, status: { $nin: [OrderStatus.BAD, OrderStatus.DELETED] }, paymentStatus: { $ne: PaymentStatus.PAID } });
     if (orders && orders.length > 0) {
       logger.info("orders found");
       const order = orders[0];
@@ -802,14 +802,14 @@ export class Order extends Model {
         //   } else {
         //     logger.warn("Client not found");
         //   }
-          
+
         // }
-        
+
       }
     } else { // add credit for Wechat
       logger.info("orders not found. Add credit to duocun account");
       const credit = await this.clientCreditModel.findOne({ paymentId }); // .then((credit) => {
-      
+
       if (credit) {
         logger.info("Credit found");
         if (credit.status === PaymentStatus.UNPAID) {
@@ -837,6 +837,7 @@ export class Order extends Model {
         await this.changeProductQuantity(order, true);
       }
     }
+    logger.info('--- Save balance to payment ---');
     logger.info("--- END PROCESS AFTER PAY ---");
   }
 
@@ -1059,10 +1060,11 @@ export class Order extends Model {
       return { ...order, address, description, items, clientPhoneNumber };
     });
 
-    return { total: arrSorted.length, orders};
+    return { total: arrSorted.length, orders };
   }
 
   async loadHistoryV2(clientId: string, itemsPerPage: number, currentPageNumber: number) {
+
     const client = await this.accountModel.findOne({ _id: clientId });
     if (!client) {
       return { total: 0, orders: [] };
@@ -1083,6 +1085,7 @@ export class Order extends Model {
       order.description = this.getDescription(order, 'zh');
       order.clientPhoneNumber = client.phone;
       order.address = this.locationModel.getAddrString(order.location);
+      order.transaction = await this.transactionModel.findOne({ paymentId: new ObjectId(order.paymentId) });
       if (group[order.paymentId]) {
         group[order.paymentId].push(order);
       } else {
@@ -1160,41 +1163,41 @@ export class Order extends Model {
     // };
 
     return new Promise((resolve, reject) => {
-    //   this.find(query).then((orders: any) => {
-    //     this.logModel.getLatestByAccount(Action.VIEW_ORDER, AccountType.MERCHANT, delivered).then((logs: any[]) => {
-    //       let rs: any[] = [];
-    //       if (logs && logs.length > 0) {
-    //         const accountIds: string[] = [];
-    //         logs.map((log: any) => { // each log has only one merchant
-    //           const merchantAccountId = log.merchantAccountId ? log.merchantAccountId.toString() : null;
-    //           if (merchantAccountId) {
-    //             accountIds.push(merchantAccountId);
-    //           }
-    //         });
+      //   this.find(query).then((orders: any) => {
+      //     this.logModel.getLatestByAccount(Action.VIEW_ORDER, AccountType.MERCHANT, delivered).then((logs: any[]) => {
+      //       let rs: any[] = [];
+      //       if (logs && logs.length > 0) {
+      //         const accountIds: string[] = [];
+      //         logs.map((log: any) => { // each log has only one merchant
+      //           const merchantAccountId = log.merchantAccountId ? log.merchantAccountId.toString() : null;
+      //           if (merchantAccountId) {
+      //             accountIds.push(merchantAccountId);
+      //           }
+      //         });
 
-    //         this.accountModel.find({ _id: { $in: accountIds } }).then(accounts => {
-    //           if (accounts && accounts.length > 0) {
-    //             accounts.map((a: IAccount) => {
-    //               const log = logs.find(l => l.merchantAccountId.toString() === a._id.toString());
-    //               const dt = moment(log.created);
-    //               const merchants: any = a.merchants;
-    //               if (merchants && merchants.length > 0) {
-    //                 const its = orders.filter((order: IOrder) => merchants.indexOf(order.merchantId.toString()) !== -1
-    //                   && moment(order.modified).isSameOrBefore(dt));
+      //         this.accountModel.find({ _id: { $in: accountIds } }).then(accounts => {
+      //           if (accounts && accounts.length > 0) {
+      //             accounts.map((a: IAccount) => {
+      //               const log = logs.find(l => l.merchantAccountId.toString() === a._id.toString());
+      //               const dt = moment(log.created);
+      //               const merchants: any = a.merchants;
+      //               if (merchants && merchants.length > 0) {
+      //                 const its = orders.filter((order: IOrder) => merchants.indexOf(order.merchantId.toString()) !== -1
+      //                   && moment(order.modified).isSameOrBefore(dt));
 
-    //                 if (its && its.length > 0) {
-    //                   rs = rs.concat(its);
-    //                 }
-    //               }
-    //             });
-    //           }
-    //           resolve(rs);
-    //         });
-    //       } else {
-    //         resolve([]);
-    //       }
-    //     });
-    //   });
+      //                 if (its && its.length > 0) {
+      //                   rs = rs.concat(its);
+      //                 }
+      //               }
+      //             });
+      //           }
+      //           resolve(rs);
+      //         });
+      //       } else {
+      //         resolve([]);
+      //       }
+      //     });
+      //   });
     });
   }
   // tools
@@ -2014,7 +2017,7 @@ export class Order extends Model {
     if (!items || !items.length) {
       throw {
         message: OrderExceptionMessage.ORDER_ITEMS_EMPTY,
-        order 
+        order
       };
     }
     for (let item of items) {
@@ -2058,7 +2061,7 @@ export class Order extends Model {
       logger.info("--- END CHANGE PRODUCT QUANTITY ---");
       throw {
         message: OrderExceptionMessage.ORDER_ITEMS_EMPTY,
-        order 
+        order
       };
     }
     for (let item of items) {
